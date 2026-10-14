@@ -38,7 +38,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Global keyboard shortcut listener (Alt+Shift+V)
 chrome.commands.onCommand.addListener((command) => {
-  if (command === 'toggle-active') {
+  if (command === 'toggle-active' || command === 'toggle_active') {
     chrome.storage.local.get(['va_settings'], (result) => {
       const settings = { ...DEFAULT_SETTINGS, ...(result.va_settings || {}) };
       settings.isActive = !settings.isActive;
