@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Aide - Accessible PDF Reader</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body class="va-reader-body">
+
+  <!-- Main Reader Header & Accommodation Bar -->
+  <header class="reader-header">
+    <div class="header-top">
+      <div class="brand">
+        <span class="logo-icon">👁️</span>
+        <h1>VISUAL AIDE <span class="badge-tag">PDF READER</span></h1>
+      </div>
+      <div class="header-controls">
+        <span id="network-status" class="status-badge online" title="Network status">
+          <span class="dot"></span> <span id="network-text">Online Mode</span>
+        </span>
+        <button id="upload-nav-btn" class="action-btn">📂 Open PDF</button>
+        <button id="print-btn" class="action-btn" title="Print with current typography">🖨️ Print</button>
+      </div>
+    </div>
+
+    <!-- Typography & Sensory Accommodation Bar -->
+    <div class="toolbar-scroll">
+      <div class="accommodation-bar">
+        <!-- Font Selection -->
+        <div class="tool-item">
+          <label for="reader-font">Typeface</label>
+          <select id="reader-font" class="tool-select">
+            <option value="OpenDyslexic">OpenDyslexic</option>
+            <option value="Lexend">Lexend</option>
+            <option value="'Atkinson Hyperlegible'">Atkinson Hyperlegible</option>
+            <option value="Verdana, Geneva, sans-serif">Verdana</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+            <option value="'Comic Sans MS', cursive">Comic Sans</option>
+            <option value="system-ui, sans-serif">System Clean</option>
+          </select>
+        </div>
+
+        <!-- Font Size Zoom -->
+        <div class="tool-item">
+          <label>Size</label>
+          <div class="btn-group">
+            <button id="font-decrease-btn" class="tool-btn" title="Decrease font size">A-</button>
+            <span id="font-size-val" class="tool-badge">18px</span>
+            <button id="font-increase-btn" class="tool-btn" title="Increase font size">A+</button>
+          </div>
+        </div>
+
+        <!-- Tracking (Letter Space) -->
+        <div class="tool-item">
+          <div class="tool-label-row">
+            <label for="reader-tracking">Tracking</label>
+            <span id="reader-tracking-val" class="tool-badge">0px</span>
+          </div>
+          <input type="range" id="reader-tracking" min="0" max="6" step="0.25" value="0">
+        </div>
+
+        <!-- Spacing (Word Space) -->
+        <div class="tool-item">
+          <div class="tool-label-row">
+            <label for="reader-spacing">Word Space</label>
+            <span id="reader-spacing-val" class="tool-badge">0px</span>
+          </div>
+          <input type="range" id="reader-spacing" min="0" max="12" step="0.5" value="0">
+        </div>
+
+        <!-- Leading (Line Height) -->
+        <div class="tool-item">
+          <div class="tool-label-row">
+            <label for="reader-leading">Leading</label>
+            <span id="reader-leading-val" class="tool-badge">1.6x</span>
+          </div>
+          <input type="range" id="reader-leading" min="1.1" max="2.6" step="0.1" value="1.6">
+        </div>
+
+        <!-- Font Color -->
+        <div class="tool-item">
+          <label for="reader-font-color">Font Color</label>
+          <select id="reader-font-color" class="tool-select">
+            <option value="default">Default</option>
+            <option value="#111111">Deep Black</option>
+            <option value="#2d2d2d">Soft Charcoal</option>
+            <option value="#0f1f38">Deep Navy</option>
+            <option value="#ffd796">Warm Amber</option>
+            <option value="#ffffff">Pure White</option>
+          </select>
+        </div>
+
+        <!-- Irlen Color Contrast Presets -->
+        <div class="tool-item">
+          <label for="reader-contrast">Irlen Contrast</label>
+          <select id="reader-contrast" class="tool-select">
+            <option value="default">Default White</option>
+            <option value="cream">Soft Cream</option>
+            <option value="peach">Warm Peach</option>
+            <option value="mint">Calm Mint</option>
+            <option value="navy">Navy Night</option>
+            <option value="dark">Charcoal Dark</option>
+            <option value="inverted">Yellow on Black</option>
+          </select>
+        </div>
+
+        <!-- Toggles: Bionic & Ruler -->
+        <div class="tool-item tool-toggles">
+          <label class="checkbox-label" title="Bold first letters of words to guide eye flow">
+            <input type="checkbox" id="reader-bionic-toggle">
+            <span>Bionic Read</span>
+          </label>
+          <label class="checkbox-label" title="Focus line ruler tracking your mouse">
+            <input type="checkbox" id="reader-ruler-toggle">
+            <span>Focus Ruler</span>
+          </label>
+        </div>
+
+        <!-- Text-to-Speech Player Controls -->
+        <div class="tool-item tts-player">
+          <label>Read Aloud</label>
+          <div class="btn-group">
+            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud">▶ Play</button>
+            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading">⏹ Stop</button>
+          </div>
+        </div>
+
+        <!-- Simplified Dictionary Search -->
+        <div class="tool-item dict-search-box">
+          <label for="dict-search-input">Simplified Dict</label>
+          <div class="input-with-btn">
+            <input type="text" id="dict-search-input" placeholder="Look up word...">
+            <button id="dict-search-btn" class="tool-btn">📖</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="reader-container">
+
+    <!-- Upload Hero Dropzone (visible when no file is loaded) -->
+    <section id="upload-hero" class="upload-hero">
+      <div class="drop-card" id="drop-zone">
+        <div class="drop-icon">📑</div>
+        <h2>Accessible PDF Reader</h2>
+        <p class="hero-desc">Open any downloaded or online PDF file. Read comfortably with dyslexia-friendly typefaces, custom word and line spacing, Irlen contrast tints, bionic reading, and full offline accessibility.</p>
+
+        <div class="drop-actions">
+          <label class="file-browse-btn">
+            📂 Choose PDF Document
+            <input type="file" id="file-input" accept=".pdf,application/pdf">
+          </label>
+          <button id="load-sample-btn" class="sample-btn">💡 Load Sample Dyslexia Guide</button>
+        </div>
+
+        <div class="online-offline-notice">
+          <span class="badge">Offline &amp; Online Ready</span>
+          <p>Works completely offline without Wi-Fi. All accessibility fonts, PDF text extractors, and simplified dictionary cache run directly inside your browser.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Active Reader Content Viewport -->
+    <article id="reader-document" class="reader-document hidden">
+      <!-- Generated pages and extracted text will be inserted here -->
+    </article>
+  </main>
+
+  <!-- Reading Ruler Overlay -->
+  <div id="reader-ruler" class="reader-ruler-el hidden"></div>
+
+  <!-- Simplified Dictionary Modal -->
+  <div id="dict-modal" class="dict-modal hidden">
+    <div class="dict-modal-backdrop" id="dict-modal-close-backdrop"></div>
+    <div class="dict-modal-content">
+      <div class="dict-modal-header">
+        <div class="dict-word-group">
+          <h3 id="dict-word">Word</h3>
+          <span id="dict-phonetic" class="dict-phonetic"></span>
+          <button id="dict-tts-btn" class="dict-audio-btn" title="Pronounce word">🔊</button>
+        </div>
+        <button id="dict-close-btn" class="dict-close-btn">&times;</button>
+      </div>
+      <div class="dict-badge-row">
+        <span id="dict-pos" class="pos-badge">noun</span>
+        <span id="dict-source" class="source-badge">offline</span>
+      </div>
+      <div class="dict-body">
+        <div class="def-block">
+          <span class="def-label">Simplified Meaning:</span>
+          <p id="dict-definition" class="dict-def-text">Definition goes here.</p>
+        </div>
+        <div id="dict-synonyms-block" class="synonyms-block">
+          <span class="def-label">Simpler Everyday Words:</span>
+          <div id="dict-synonyms" class="synonyms-list"></div>
+        </div>
+        <div id="dict-example-block" class="example-block">
+          <span class="def-label">Example Sentence:</span>
+          <p id="dict-example" class="dict-example-text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- External & Local Scripts -->
+  <script src="lib/pdf.min.js"></script>
+  <script src="dictionary.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>

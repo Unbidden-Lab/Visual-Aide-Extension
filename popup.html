@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-row">
+        <div class="brand-group">
+          <h1>VISUAL AIDE</h1>
+          <span class="shortcut-tag" title="Toggle shortcut: Alt+Shift+V">Alt+Shift+V</span>
+        </div>
+        <label class="toggle-switch" title="Toggle Visual Aide">
+          <input type="checkbox" id="master-toggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="subheader-row">
+        <p class="subtitle" id="status-text">System active.</p>
+        <button id="reset-btn" class="reset-btn" title="Reset all settings to default">Reset</button>
+      </div>
+
+      <!-- Quick Launch PDF Reader -->
+      <button id="open-reader-btn" class="reader-launch-btn" title="Open accessible PDF Reader studio">
+        📄 Open Accessible PDF Reader
+      </button>
+    </header>
+
+    <div id="controls-container">
+      <!-- Presets -->
+      <div class="section-title">Severity Presets</div>
+      <div class="level-group">
+        <button class="level-btn" data-level="1">L1: Mild</button>
+        <button class="level-btn" data-level="2">L2: Mod</button>
+        <button class="level-btn" data-level="3">L3: Max</button>
+      </div>
+
+      <!-- Typography & Color Contrast -->
+      <div class="section-header">
+        <span class="section-title">Typography &amp; Contrast</span>
+      </div>
+
+      <div class="control-card">
+        <div class="slider-group">
+          <label for="font-family">Typeface</label>
+          <select id="font-family" class="custom-select">
+            <option value="OpenDyslexic">OpenDyslexic (Specialized)</option>
+            <option value="Lexend">Lexend (Reading Fluency)</option>
+            <option value="'Atkinson Hyperlegible'">Atkinson Hyperlegible (Clear)</option>
+            <option value="Verdana, Geneva, sans-serif">Verdana (Wide Sans)</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+            <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sans (Legible)</option>
+            <option value="system-ui, -apple-system, sans-serif">System Clean</option>
+            <option value="inherit">Website Default</option>
+          </select>
+        </div>
+
+        <!-- Font Color Selection -->
+        <div class="slider-group">
+          <label for="font-color">Font Color</label>
+          <select id="font-color" class="custom-select">
+            <option value="default">Default</option>
+            <option value="#111111">Deep Black (#111111)</option>
+            <option value="#2d2d2d">Soft Charcoal (#2d2d2d)</option>
+            <option value="#0f1f38">Deep Navy (#0f1f38)</option>
+            <option value="#ffd796">Warm Amber (#ffd796)</option>
+            <option value="#ffffff">Pure White (#ffffff)</option>
+          </select>
+        </div>
+
+        <!-- Irlen Color Contrast Presets -->
+        <div class="slider-group">
+          <label for="contrast-mode">Color Contrast (Irlen Support)</label>
+          <select id="contrast-mode" class="custom-select">
+            <option value="default">Website Default</option>
+            <option value="cream">Soft Cream (Dark on Warm Amber)</option>
+            <option value="peach">Warm Peach (Dark on Soft Peach)</option>
+            <option value="mint">Calm Mint (Dark on Soft Mint)</option>
+            <option value="navy">Navy Night (Amber on Deep Navy)</option>
+            <option value="dark">Charcoal Dark (Light on Dark)</option>
+            <option value="inverted">High Contrast Inverted (Yellow on Black)</option>
+          </select>
+        </div>
+
+        <!-- Tracking (Letter Space) -->
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="tracking">Tracking (Letter Space)</label>
+            <span class="val-badge" id="tracking-val">0px</span>
+          </div>
+          <input type="range" id="tracking" min="0" max="6" step="0.25" value="0">
+        </div>
+
+        <!-- Spacing (Word Space) -->
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="spacing">Spacing (Word Space)</label>
+            <span class="val-badge" id="spacing-val">0px</span>
+          </div>
+          <input type="range" id="spacing" min="0" max="12" step="0.5" value="0">
+        </div>
+
+        <!-- Leading (Line Height) -->
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="leading">Leading (Line Height)</label>
+            <span class="val-badge" id="leading-val">1.5x</span>
+          </div>
+          <input type="range" id="leading" min="1.0" max="2.8" step="0.1" value="1.5">
+        </div>
+
+        <!-- Paragraph Spacing -->
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="paragraph-spacing">Paragraph Spacing</label>
+            <span class="val-badge" id="paragraph-spacing-val">0px</span>
+          </div>
+          <input type="range" id="paragraph-spacing" min="0" max="24" step="2" value="0">
+        </div>
+
+        <!-- Left Align Toggle -->
+        <div class="switch-row">
+          <div class="switch-info">
+            <span class="switch-title">Left-Align Text</span>
+            <span class="switch-desc">Eliminates uneven word rivers</span>
+          </div>
+          <label class="toggle-switch small">
+            <input type="checkbox" id="left-align-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Focus & Sensory Interventions -->
+      <div class="section-header">
+        <span class="section-title">Focus &amp; Sensory Aids</span>
+      </div>
+
+      <div class="control-card">
+        <!-- Bionic Reading Toggle -->
+        <div class="switch-row">
+          <div class="switch-info">
+            <span class="switch-title">Bionic Reading</span>
+            <span class="switch-desc">Guides saccadic eye jumps</span>
+          </div>
+          <label class="toggle-switch small">
+            <input type="checkbox" id="bionic-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Simplified Dictionary Toggle -->
+        <div class="divider"></div>
+        <div class="switch-row">
+          <div class="switch-info">
+            <span class="switch-title">Simplified Dictionary</span>
+            <span class="switch-desc">Double-click word for plain explanation</span>
+          </div>
+          <label class="toggle-switch small">
+            <input type="checkbox" id="dict-toggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Glare Tint Overlay -->
+        <div class="divider"></div>
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="overlay">Glare Tint Intensity</label>
+            <span class="val-badge" id="overlay-val">0%</span>
+          </div>
+          <input type="range" id="overlay" min="0" max="0.75" step="0.05" value="0">
+        </div>
+
+        <div class="tint-palette-group">
+          <span class="sub-label">Tint Spectrum</span>
+          <div class="color-chips" id="tint-palette">
+            <button type="button" class="color-chip active" data-color="amber" style="--chip-color: #ffd796;" title="Warm Amber"></button>
+            <button type="button" class="color-chip" data-color="peach" style="--chip-color: #ffcdb4;" title="Warm Peach"></button>
+            <button type="button" class="color-chip" data-color="rose" style="--chip-color: #ffc3cd;" title="Soft Rose"></button>
+            <button type="button" class="color-chip" data-color="mint" style="--chip-color: #bef0d2;" title="Mint Green"></button>
+            <button type="button" class="color-chip" data-color="blue" style="--chip-color: #bee1ff;" title="Sky Blue"></button>
+            <button type="button" class="color-chip" data-color="lavender" style="--chip-color: #e1d2ff;" title="Lavender"></button>
+            <button type="button" class="color-chip" data-color="cream" style="--chip-color: #fffacd;" title="Soft Cream"></button>
+          </div>
+        </div>
+
+        <!-- Reading Ruler & Mask -->
+        <div class="divider"></div>
+        <div class="switch-row">
+          <div class="switch-info">
+            <span class="switch-title">Reading Guide</span>
+            <span class="switch-desc">Cursor-guided focus band</span>
+          </div>
+          <label class="toggle-switch small">
+            <input type="checkbox" id="ruler-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div id="ruler-options" class="nested-options hidden">
+          <div class="segmented-control">
+            <button type="button" class="segment-btn active" data-ruler-mode="bar">Focus Bar</button>
+            <button type="button" class="segment-btn" data-ruler-mode="mask">Reading Mask</button>
+          </div>
+          <div class="slider-group" style="margin-top: 10px;">
+            <div class="label-row">
+              <label for="ruler-height">Guide Slot Height</label>
+              <span class="val-badge" id="ruler-height-val">40px</span>
+            </div>
+            <input type="range" id="ruler-height" min="20" max="80" step="5" value="40">
+          </div>
+        </div>
+
+        <!-- Read Aloud Text-to-Speech -->
+        <div class="divider"></div>
+        <div class="switch-row">
+          <div class="switch-info">
+            <span class="switch-title">Read Aloud (TTS)</span>
+            <span class="switch-desc">Select text on page to speak</span>
+          </div>
+          <label class="toggle-switch small">
+            <input type="checkbox" id="tts-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
