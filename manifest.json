@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Visual Aide Argon",
+  "name": "Visual Aide",
   "version": "1.3.0",
   "description": "Dynamic, client-side typographic and sensory interventions for dyslexia and visual reading accessibility with offline PDF reader.",
   "icons": {
