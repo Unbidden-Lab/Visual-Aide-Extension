@@ -96,9 +96,44 @@ function initSettingsSync() {
         updateToolbarUI();
       }
     });
+
+    if (chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
+          const s = changes.va_settings.newValue;
+          if (s.font) currentReaderSettings.font = s.font;
+          if (s.tracking !== undefined) currentReaderSettings.tracking = s.tracking;
+          if (s.spacing !== undefined) currentReaderSettings.spacing = s.spacing;
+          if (s.leading !== undefined) currentReaderSettings.leading = s.leading;
+          if (s.fontColor) currentReaderSettings.fontColor = s.fontColor;
+          if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
+          if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
+          if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
+          applyAllReaderStyles();
+          updateToolbarUI();
+        }
+      });
+    }
   } else {
     applyAllReaderStyles();
     updateToolbarUI();
+  }
+}
+
+function saveReaderSettings() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['va_settings'], (result) => {
+      const existing = result.va_settings || {};
+      existing.font = currentReaderSettings.font;
+      existing.tracking = currentReaderSettings.tracking;
+      existing.spacing = currentReaderSettings.spacing;
+      existing.leading = currentReaderSettings.leading;
+      existing.fontColor = currentReaderSettings.fontColor;
+      existing.contrastMode = currentReaderSettings.contrast;
+      existing.bionic = currentReaderSettings.bionic;
+      existing.ruler = currentReaderSettings.ruler;
+      chrome.storage.local.set({ va_settings: existing });
+    });
   }
 }
 
@@ -125,6 +160,7 @@ function initToolbarControls() {
   fontSelect.addEventListener('change', (e) => {
     currentReaderSettings.font = e.target.value;
     applyAllReaderStyles();
+    saveReaderSettings();
   });
 
   // Font Size
@@ -132,11 +168,13 @@ function initToolbarControls() {
     currentReaderSettings.fontSize = Math.max(12, currentReaderSettings.fontSize - 2);
     fontSizeVal.textContent = `${currentReaderSettings.fontSize}px`;
     applyAllReaderStyles();
+    saveReaderSettings();
   });
   fontIncBtn.addEventListener('click', () => {
     currentReaderSettings.fontSize = Math.min(36, currentReaderSettings.fontSize + 2);
     fontSizeVal.textContent = `${currentReaderSettings.fontSize}px`;
     applyAllReaderStyles();
+    saveReaderSettings();
   });
 
   // Tracking
@@ -145,12 +183,18 @@ function initToolbarControls() {
     trackingVal.textContent = `${currentReaderSettings.tracking}px`;
     applyAllReaderStyles();
   });
+  trackingSlider.addEventListener('change', () => {
+    saveReaderSettings();
+  });
 
   // Spacing
   spacingSlider.addEventListener('input', (e) => {
     currentReaderSettings.spacing = parseFloat(e.target.value);
     spacingVal.textContent = `${currentReaderSettings.spacing}px`;
     applyAllReaderStyles();
+  });
+  spacingSlider.addEventListener('change', () => {
+    saveReaderSettings();
   });
 
   // Leading
@@ -159,29 +203,36 @@ function initToolbarControls() {
     leadingVal.textContent = `${currentReaderSettings.leading}x`;
     applyAllReaderStyles();
   });
+  leadingSlider.addEventListener('change', () => {
+    saveReaderSettings();
+  });
 
   // Font Color
   fontColorSelect.addEventListener('change', (e) => {
     currentReaderSettings.fontColor = e.target.value;
     applyAllReaderStyles();
+    saveReaderSettings();
   });
 
   // Irlen Contrast Mode
   contrastSelect.addEventListener('change', (e) => {
     currentReaderSettings.contrast = e.target.value;
     applyAllReaderStyles();
+    saveReaderSettings();
   });
 
   // Bionic
   bionicToggle.addEventListener('change', (e) => {
     currentReaderSettings.bionic = e.target.checked;
     reRenderActiveDocument();
+    saveReaderSettings();
   });
 
   // Ruler
   rulerToggle.addEventListener('change', (e) => {
     currentReaderSettings.ruler = e.target.checked;
     updateReaderRuler(currentReaderSettings.ruler);
+    saveReaderSettings();
   });
 
   // Print
@@ -200,18 +251,54 @@ function initToolbarControls() {
 }
 
 function updateToolbarUI() {
-  document.getElementById('reader-font').value = currentReaderSettings.font || 'OpenDyslexic';
-  document.getElementById('font-size-val').textContent = `${currentReaderSettings.fontSize}px`;
-  document.getElementById('reader-tracking').value = currentReaderSettings.tracking;
-  document.getElementById('reader-tracking-val').textContent = `${currentReaderSettings.tracking}px`;
-  document.getElementById('reader-spacing').value = currentReaderSettings.spacing;
-  document.getElementById('reader-spacing-val').textContent = `${currentReaderSettings.spacing}px`;
-  document.getElementById('reader-leading').value = currentReaderSettings.leading;
-  document.getElementById('reader-leading-val').textContent = `${currentReaderSettings.leading}x`;
-  document.getElementById('reader-font-color').value = currentReaderSettings.fontColor || 'default';
-  document.getElementById('reader-contrast').value = currentReaderSettings.contrast || 'default';
-  document.getElementById('reader-bionic-toggle').checked = Boolean(currentReaderSettings.bionic);
-  document.getElementById('reader-ruler-toggle').checked = Boolean(currentReaderSettings.ruler);
+  const fontEl = document.getElementById('reader-font');
+  if (fontEl) fontEl.value = currentReaderSettings.font || 'OpenDyslexic';
+
+  const fontSizeVal = document.getElementById('font-size-val');
+  if (fontSizeVal) fontSizeVal.textContent = `${currentReaderSettings.fontSize}px`;
+
+  const trackingEl = document.getElementById('reader-tracking');
+  if (trackingEl) trackingEl.value = currentReaderSettings.tracking;
+  const trackingVal = document.getElementById('reader-tracking-val');
+  if (trackingVal) trackingVal.textContent = `${currentReaderSettings.tracking}px`;
+
+  const spacingEl = document.getElementById('reader-spacing');
+  if (spacingEl) spacingEl.value = currentReaderSettings.spacing;
+  const spacingVal = document.getElementById('reader-spacing-val');
+  if (spacingVal) spacingVal.textContent = `${currentReaderSettings.spacing}px`;
+
+  const leadingEl = document.getElementById('reader-leading');
+  if (leadingEl) leadingEl.value = currentReaderSettings.leading;
+  const leadingVal = document.getElementById('reader-leading-val');
+  if (leadingVal) leadingVal.textContent = `${currentReaderSettings.leading}x`;
+
+  const fontColorEl = document.getElementById('reader-font-color');
+  if (fontColorEl) {
+    const targetVal = currentReaderSettings.fontColor || 'default';
+    const match = Array.from(fontColorEl.options).find(
+      (opt) => opt.value.toLowerCase() === targetVal.toLowerCase()
+    );
+    if (match) {
+      fontColorEl.value = match.value;
+    } else if (targetVal !== 'default') {
+      const opt = document.createElement('option');
+      opt.value = targetVal;
+      opt.textContent = `Custom (${targetVal})`;
+      fontColorEl.appendChild(opt);
+      fontColorEl.value = targetVal;
+    } else {
+      fontColorEl.value = 'default';
+    }
+  }
+
+  const contrastEl = document.getElementById('reader-contrast');
+  if (contrastEl) contrastEl.value = currentReaderSettings.contrast || 'default';
+
+  const bionicEl = document.getElementById('reader-bionic-toggle');
+  if (bionicEl) bionicEl.checked = Boolean(currentReaderSettings.bionic);
+
+  const rulerEl = document.getElementById('reader-ruler-toggle');
+  if (rulerEl) rulerEl.checked = Boolean(currentReaderSettings.ruler);
 }
 
 function applyAllReaderStyles() {
@@ -228,8 +315,42 @@ function applyAllReaderStyles() {
     body.classList.add(`contrast-${currentReaderSettings.contrast}`);
   }
 
-  if (currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default') {
-    root.style.setProperty('--reader-text', currentReaderSettings.fontColor);
+  const docContainer = document.getElementById('reader-document');
+  const hasCustomFontColor = Boolean(
+    currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default'
+  );
+
+  if (hasCustomFontColor) {
+    const chosenColor = currentReaderSettings.fontColor;
+    root.style.setProperty('--reader-text', chosenColor);
+    body.style.setProperty('--reader-text', chosenColor, 'important');
+    if (docContainer) {
+      docContainer.style.setProperty('--reader-text', chosenColor, 'important');
+      docContainer.style.setProperty('color', chosenColor, 'important');
+      docContainer.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
+      const textEls = docContainer.querySelectorAll(
+        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+      );
+      textEls.forEach((el) => {
+        el.style.setProperty('color', chosenColor, 'important');
+        el.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
+      });
+    }
+  } else {
+    root.style.removeProperty('--reader-text');
+    body.style.removeProperty('--reader-text');
+    if (docContainer) {
+      docContainer.style.removeProperty('--reader-text');
+      docContainer.style.removeProperty('color');
+      docContainer.style.removeProperty('-webkit-text-fill-color');
+      const textEls = docContainer.querySelectorAll(
+        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+      );
+      textEls.forEach((el) => {
+        el.style.removeProperty('color');
+        el.style.removeProperty('-webkit-text-fill-color');
+      });
+    }
   }
 }
 
@@ -378,6 +499,8 @@ function displayExtractedPages(docTitle) {
 
     docContainer.appendChild(pageEl);
   });
+
+  applyAllReaderStyles();
 }
 
 function reRenderActiveDocument() {
