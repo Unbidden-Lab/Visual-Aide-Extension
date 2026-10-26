@@ -68,7 +68,7 @@ let currentSettings = {
   rulerMode: 'bar',
   rulerHeight: 40,
   bionic: false,
-  tts: false,
+  tts: true,
   dictionary: true
 };
 
@@ -1061,13 +1061,26 @@ function removeDictModal() {
 // -------------------------------------------------------------
 document.addEventListener('mouseup', handleTextSelection);
 
+document.addEventListener('dblclick', (e) => {
+  if (!currentSettings.isActive) return;
+  if (actionBadge && actionBadge.contains(e.target)) return;
+  if (dictModal && dictModal.contains(e.target)) return;
+
+  const selection = window.getSelection();
+  const text = selection ? selection.toString().trim() : '';
+  if (text && text.length >= 2 && !/\s/.test(text) && text.length < 30) {
+    removeActionBadge();
+    openInPageDictionary(text, e.pageX || e.clientX, (e.pageY || e.clientY) + 10);
+  }
+});
+
 function applyAll(settings) {
   if (settings.kerning !== undefined && settings.tracking === undefined) {
     settings.tracking = settings.kerning;
     settings.spacing = settings.kerning * 2.5;
   }
 
-  currentSettings = { ...currentSettings, ...settings };
+  currentSettings = { ...currentSettings, ...settings, tts: true, dictionary: true };
   setupStyleBlock();
 }
 

@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS = {
   rulerMode: 'bar',
   rulerHeight: 40,
   bionic: false,
-  tts: false,
+  tts: true,
   dictionary: true
 };
 
@@ -78,14 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const leftAlignToggle = document.getElementById('left-align-toggle');
 
   const bionicToggle = document.getElementById('bionic-toggle');
-  const dictToggle = document.getElementById('dict-toggle');
   const overlaySlider = document.getElementById('overlay');
   const tintChips = document.querySelectorAll('#tint-palette .color-chip');
   const rulerToggle = document.getElementById('ruler-toggle');
   const rulerOptions = document.getElementById('ruler-options');
   const rulerModeBtns = document.querySelectorAll('.segment-btn');
   const rulerHeightSlider = document.getElementById('ruler-height');
-  const ttsToggle = document.getElementById('tts-toggle');
 
   const trackingVal = document.getElementById('tracking-val');
   const spacingVal = document.getElementById('spacing-val');
@@ -103,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       raw.tracking = raw.kerning;
       raw.spacing = raw.kerning * 2.5;
     }
-    currentSettings = { ...DEFAULT_SETTINGS, ...raw };
+    currentSettings = { ...DEFAULT_SETTINGS, ...raw, tts: true, dictionary: true };
     masterToggle.checked = currentSettings.isActive !== false;
     updateToggleUI(masterToggle.checked);
     updateUI(currentSettings);
@@ -181,14 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAndApply(currentSettings);
   });
 
-  // Simplified Dictionary toggle
-  if (dictToggle) {
-    dictToggle.addEventListener('change', (e) => {
-      currentSettings.dictionary = e.target.checked;
-      saveAndApply(currentSettings);
-    });
-  }
-
   // Glare Tint Color Chips
   tintChips.forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -232,12 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAndApply(currentSettings);
   });
 
-  // Text to Speech toggle
-  ttsToggle.addEventListener('change', (e) => {
-    currentSettings.tts = e.target.checked;
-    saveAndApply(currentSettings);
-  });
-
   function updateToggleUI(isActive) {
     if (isActive) {
       statusText.textContent = 'System active.';
@@ -276,8 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
     leftAlignToggle.checked = Boolean(settings.forceLeftAlign);
 
     bionicToggle.checked = Boolean(settings.bionic);
-    if (dictToggle) dictToggle.checked = settings.dictionary !== false;
-
     overlaySlider.value = settings.overlay || 0;
     tintChips.forEach((chip) => {
       chip.classList.toggle('active', chip.dataset.color === (settings.tintColor || 'amber'));
@@ -290,16 +272,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     rulerHeightSlider.value = settings.rulerHeight || 40;
 
-    ttsToggle.checked = Boolean(settings.tts);
-
     updateBadges(settings);
   }
 
   function saveAndApply(settings) {
-    chrome.storage.local.set({ va_settings: settings }, () => {
+    const toSave = { ...settings, tts: true, dictionary: true };
+    chrome.storage.local.set({ va_settings: toSave }, () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'update_styles', settings }).catch(() => {});
+          chrome.tabs.sendMessage(tabs[0].id, { action: 'update_styles', settings: toSave }).catch(() => {});
         }
       });
     });

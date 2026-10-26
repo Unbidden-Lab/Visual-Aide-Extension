@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
   rulerMode: 'bar',
   rulerHeight: 40,
   bionic: false,
-  tts: false,
+  tts: true,
   dictionary: true
 };
 
@@ -31,7 +31,7 @@ chrome.runtime.onInstalled.addListener(() => {
       existing.tracking = existing.kerning;
       existing.spacing = existing.kerning * 2.5;
     }
-    const merged = { ...DEFAULT_SETTINGS, ...existing };
+    const merged = { ...DEFAULT_SETTINGS, ...existing, tts: true, dictionary: true };
     chrome.storage.local.set({ va_settings: merged });
   });
 });
