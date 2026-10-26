@@ -13,13 +13,13 @@
           <span class="shortcut-tag" title="Toggle shortcut: Alt+Shift+V">Alt+Shift+V</span>
         </div>
         <label class="toggle-switch" title="Toggle Visual Aide">
-          <input type="checkbox" id="master-toggle" checked>
+          <input type="checkbox" id="master-toggle" checked aria-label="Toggle Visual Aide on or off">
           <span class="toggle-slider"></span>
         </label>
       </div>
       <div class="subheader-row">
         <p class="subtitle" id="status-text">System active.</p>
-        <button id="reset-btn" class="reset-btn" title="Reset all settings to default">Reset</button>
+        <button id="reset-btn" class="reset-btn" title="Reset all settings to default" aria-label="Reset all settings to default">Reset</button>
       </div>
 
       <!-- Quick Launch PDF Reader -->
@@ -31,10 +31,10 @@
     <div id="controls-container">
       <!-- Presets -->
       <div class="section-title">Severity Presets</div>
-      <div class="level-group">
-        <button class="level-btn" data-level="1">L1: Mild</button>
-        <button class="level-btn" data-level="2">L2: Mod</button>
-        <button class="level-btn" data-level="3">L3: Max</button>
+      <div class="level-group" role="group" aria-label="Severity presets">
+        <button class="level-btn" data-level="1" aria-pressed="false">L1: Mild</button>
+        <button class="level-btn" data-level="2" aria-pressed="false">L2: Mod</button>
+        <button class="level-btn" data-level="3" aria-pressed="false">L3: Max</button>
       </div>
 
       <!-- Typography & Color Contrast -->
@@ -189,9 +189,9 @@
         </div>
 
         <div id="ruler-options" class="nested-options hidden">
-          <div class="segmented-control">
-            <button type="button" class="segment-btn active" data-ruler-mode="bar">Focus Bar</button>
-            <button type="button" class="segment-btn" data-ruler-mode="mask">Reading Mask</button>
+          <div class="segmented-control" role="radiogroup" aria-label="Ruler display mode">
+            <button type="button" class="segment-btn active" data-ruler-mode="bar" role="radio" aria-checked="true">Focus Bar</button>
+            <button type="button" class="segment-btn" data-ruler-mode="mask" role="radio" aria-checked="false">Reading Mask</button>
           </div>
           <div class="slider-group" style="margin-top: 10px;">
             <div class="label-row">

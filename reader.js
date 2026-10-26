@@ -41,7 +41,20 @@ let currentReaderSettings = {
 
 let currentPdfDocument = null;
 let currentLoadedPages = [];
+    currentReaderPageIndex = 1;
 let ttsUtterance = null;
+let currentReaderPageIndex = 1;
+let currentDocumentTitle = 'Document';
+let readerLastFocusedEl = null;
+
+// Throttled mouse tracking state
+let readerRulerRafId = null;
+let readerLastMouseY = 0;
+
+// Chunked TTS playback state
+let readerTtsQueue = [];
+let readerTtsIndex = 0;
+let readerTtsTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   initNetworkStatus();
@@ -248,6 +261,12 @@ function initToolbarControls() {
   // TTS buttons
   document.getElementById('reader-tts-play').addEventListener('click', handleTtsPlay);
   document.getElementById('reader-tts-stop').addEventListener('click', handleTtsStop);
+
+  // Multi-page navigation (Improvement 2)
+  const prevBtn = document.getElementById('reader-page-prev');
+  if (prevBtn) prevBtn.addEventListener('click', goToPreviousPage);
+  const nextBtn = document.getElementById('reader-page-next');
+  if (nextBtn) nextBtn.addEventListener('click', goToNextPage);
 }
 
 function updateToolbarUI() {
@@ -469,22 +488,44 @@ function formatPdfTextToParagraphs(items) {
 // Document Rendering & Bionic Transform
 // -------------------------------------------------------------
 function displayExtractedPages(docTitle) {
+  if (docTitle) currentDocumentTitle = docTitle;
   document.getElementById('upload-hero').classList.add('hidden');
   const docContainer = document.getElementById('reader-document');
   docContainer.innerHTML = '';
   docContainer.classList.remove('hidden');
 
+  const totalPages = (currentLoadedPages && currentLoadedPages.length) || 1;
+  if (currentReaderPageIndex > totalPages) currentReaderPageIndex = totalPages;
+  if (currentReaderPageIndex < 1) currentReaderPageIndex = 1;
+
+  // Update header toolbar page navigation
+  const pageNav = document.getElementById('reader-page-nav');
+  const pageIndicator = document.getElementById('reader-page-indicator');
+  const prevBtn = document.getElementById('reader-page-prev');
+  const nextBtn = document.getElementById('reader-page-next');
+
+  if (totalPages > 1) {
+    if (pageNav) pageNav.style.display = 'flex';
+    if (pageIndicator) pageIndicator.textContent = `${currentReaderPageIndex} / ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = currentReaderPageIndex <= 1;
+    if (nextBtn) nextBtn.disabled = currentReaderPageIndex >= totalPages;
+  } else {
+    if (pageNav) pageNav.style.display = 'none';
+  }
+
   const titleEl = document.createElement('h1');
-  titleEl.textContent = docTitle;
+  titleEl.textContent = currentDocumentTitle;
   docContainer.appendChild(titleEl);
 
-  currentLoadedPages.forEach(page => {
+  // Render current active page only (prevents memory explosion on 50+ page PDFs)
+  const page = currentLoadedPages[currentReaderPageIndex - 1] || currentLoadedPages[0];
+  if (page) {
     const pageEl = document.createElement('section');
     pageEl.className = 'reader-page';
 
     const pageTag = document.createElement('span');
     pageTag.className = 'page-header-tag';
-    pageTag.textContent = `Page ${page.pageNumber}`;
+    pageTag.textContent = totalPages > 1 ? `Page ${page.pageNumber} of ${totalPages}` : `Page ${page.pageNumber}`;
     pageEl.appendChild(pageTag);
 
     page.paragraphs.forEach(paraText => {
@@ -498,20 +539,50 @@ function displayExtractedPages(docTitle) {
     });
 
     docContainer.appendChild(pageEl);
-  });
+  }
+
+  // Bottom pagination controls for multi-page documents
+  if (totalPages > 1) {
+    const bottomNav = document.createElement('div');
+    bottomNav.className = 'reader-pagination-bar';
+    bottomNav.innerHTML = `
+      <button class="reader-page-btn" id="bottom-page-prev" ${currentReaderPageIndex <= 1 ? 'disabled' : ''} aria-label="Go to previous page">◀ Previous Page</button>
+      <span class="reader-page-counter">Page ${currentReaderPageIndex} of ${totalPages}</span>
+      <button class="reader-page-btn" id="bottom-page-next" ${currentReaderPageIndex >= totalPages ? 'disabled' : ''} aria-label="Go to next page">Next Page ▶</button>
+    `;
+    docContainer.appendChild(bottomNav);
+
+    document.getElementById('bottom-page-prev')?.addEventListener('click', goToPreviousPage);
+    document.getElementById('bottom-page-next')?.addEventListener('click', goToNextPage);
+  }
 
   applyAllReaderStyles();
 }
 
+function goToPreviousPage() {
+  if (currentReaderPageIndex > 1) {
+    currentReaderPageIndex--;
+    displayExtractedPages(currentDocumentTitle);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function goToNextPage() {
+  if (currentReaderPageIndex < currentLoadedPages.length) {
+    currentReaderPageIndex++;
+    displayExtractedPages(currentDocumentTitle);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
 function reRenderActiveDocument() {
   if (currentLoadedPages && currentLoadedPages.length > 0) {
-    const titleEl = document.querySelector('.reader-document h1');
-    const title = titleEl ? titleEl.textContent : 'Document';
-    displayExtractedPages(title);
+    displayExtractedPages(currentDocumentTitle);
   }
 }
 
 function loadSampleDocument() {
+  currentReaderPageIndex = 1;
   currentLoadedPages = [
     {
       pageNumber: 1,
@@ -560,41 +631,115 @@ function updateReaderRuler(enabled) {
 }
 
 function handleReaderMouseMove(e) {
-  if (rulerEl && currentReaderSettings.ruler) {
-    rulerEl.style.top = `${e.clientY - 20}px`;
+  readerLastMouseY = e.clientY;
+  if (readerRulerRafId === null) {
+    readerRulerRafId = requestAnimationFrame(() => {
+      readerRulerRafId = null;
+      if (rulerEl && currentReaderSettings.ruler) {
+        rulerEl.style.top = (readerLastMouseY - 20) + 'px';
+      }
+    });
   }
 }
 
 // -------------------------------------------------------------
 // Text to Speech (TTS)
 // -------------------------------------------------------------
-function handleTtsPlay() {
-  if (window.speechSynthesis) {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.resume();
-      return;
+function chunkReaderTtsText(text) {
+  if (!text) return [];
+  const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+  const chunks = [];
+  let current = '';
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i].trim();
+    if (!s) continue;
+    if ((current + ' ' + s).length > 180 && current) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current += (current ? ' ' : '') + s;
     }
-
-    const selection = window.getSelection().toString().trim();
-    let textToRead = selection;
-
-    if (!textToRead) {
-      const doc = document.getElementById('reader-document');
-      textToRead = doc ? doc.innerText : '';
-    }
-
-    if (!textToRead) return;
-
-    ttsUtterance = new SpeechSynthesisUtterance(textToRead);
-    ttsUtterance.rate = 0.95;
-    window.speechSynthesis.speak(ttsUtterance);
   }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+function startReaderTtsHeartbeat() {
+  stopReaderTtsHeartbeat();
+  readerTtsTimer = setInterval(() => {
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    } else {
+      stopReaderTtsHeartbeat();
+    }
+  }, 10000);
+}
+
+function stopReaderTtsHeartbeat() {
+  if (readerTtsTimer) {
+    clearInterval(readerTtsTimer);
+    readerTtsTimer = null;
+  }
+}
+
+function playNextReaderTtsChunk() {
+  if (!window.speechSynthesis || readerTtsIndex >= readerTtsQueue.length) {
+    handleTtsStop();
+    return;
+  }
+
+  const chunk = readerTtsQueue[readerTtsIndex];
+  ttsUtterance = new SpeechSynthesisUtterance(chunk);
+  ttsUtterance.rate = 0.95;
+
+  ttsUtterance.onend = () => {
+    readerTtsIndex++;
+    playNextReaderTtsChunk();
+  };
+
+  ttsUtterance.onerror = (err) => {
+    console.warn('Reader TTS error:', err);
+    handleTtsStop();
+  };
+
+  window.speechSynthesis.speak(ttsUtterance);
+}
+
+function handleTtsPlay() {
+  if (!window.speechSynthesis) return;
+
+  if (window.speechSynthesis.speaking && readerTtsQueue.length > 0) {
+    window.speechSynthesis.resume();
+    return;
+  }
+
+  const selection = window.getSelection().toString().trim();
+  let textToRead = selection;
+
+  if (!textToRead) {
+    const pageEl = document.querySelector('.reader-document .reader-page');
+    textToRead = pageEl ? pageEl.innerText : '';
+  }
+
+  if (!textToRead) return;
+
+  const chunks = chunkReaderTtsText(textToRead);
+  if (chunks.length === 0) return;
+
+  readerTtsQueue = chunks;
+  readerTtsIndex = 0;
+  startReaderTtsHeartbeat();
+  playNextReaderTtsChunk();
 }
 
 function handleTtsStop() {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
+  stopReaderTtsHeartbeat();
+  readerTtsQueue = [];
+  readerTtsIndex = 0;
 }
 
 // -------------------------------------------------------------
@@ -711,3 +856,13 @@ async function openDictionaryModal(word) {
 function closeDictionaryModal() {
   document.getElementById('dict-modal').classList.add('hidden');
 }
+
+// Dismiss dictionary modal on Escape key (Improvement 5)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('dict-modal');
+    if (modal && !modal.classList.contains('hidden')) {
+      closeDictionaryModal();
+    }
+  }
+});

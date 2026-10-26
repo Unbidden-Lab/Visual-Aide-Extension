@@ -45,9 +45,9 @@
         <div class="tool-item">
           <label>Size</label>
           <div class="btn-group">
-            <button id="font-decrease-btn" class="tool-btn" title="Decrease font size">A-</button>
+            <button id="font-decrease-btn" class="tool-btn" title="Decrease font size" aria-label="Decrease font size">A-</button>
             <span id="font-size-val" class="tool-badge">18px</span>
-            <button id="font-increase-btn" class="tool-btn" title="Increase font size">A+</button>
+            <button id="font-increase-btn" class="tool-btn" title="Increase font size" aria-label="Increase font size">A+</button>
           </div>
         </div>
 
@@ -121,8 +121,18 @@
         <div class="tool-item tts-player">
           <label>Read Aloud</label>
           <div class="btn-group">
-            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud">▶ Play</button>
-            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading">⏹ Stop</button>
+            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud" aria-label="Play text-to-speech">▶ Play</button>
+            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading" aria-label="Stop text-to-speech">⏹ Stop</button>
+          </div>
+        </div>
+
+        <!-- Multi-Page Navigation Bar (Improvement 2) -->
+        <div class="tool-item page-nav" id="reader-page-nav" style="display: none;">
+          <label>Page</label>
+          <div class="btn-group">
+            <button id="reader-page-prev" class="tool-btn icon-btn" title="Previous page" aria-label="Go to previous page" disabled>◀</button>
+            <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
+            <button id="reader-page-next" class="tool-btn icon-btn" title="Next page" aria-label="Go to next page">▶</button>
           </div>
         </div>
 
@@ -131,7 +141,7 @@
           <label for="dict-search-input">Simplified Dict</label>
           <div class="input-with-btn">
             <input type="text" id="dict-search-input" placeholder="Look up word...">
-            <button id="dict-search-btn" class="tool-btn">📖</button>
+            <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">📖</button>
           </div>
         </div>
       </div>
@@ -173,16 +183,16 @@
   <div id="reader-ruler" class="reader-ruler-el hidden"></div>
 
   <!-- Simplified Dictionary Modal -->
-  <div id="dict-modal" class="dict-modal hidden">
+  <div id="dict-modal" class="dict-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dict-word">
     <div class="dict-modal-backdrop" id="dict-modal-close-backdrop"></div>
     <div class="dict-modal-content">
       <div class="dict-modal-header">
         <div class="dict-word-group">
           <h3 id="dict-word">Word</h3>
           <span id="dict-phonetic" class="dict-phonetic"></span>
-          <button id="dict-tts-btn" class="dict-audio-btn" title="Pronounce word">🔊</button>
+          <button id="dict-tts-btn" class="dict-audio-btn" title="Pronounce word" aria-label="Pronounce word">🔊</button>
         </div>
-        <button id="dict-close-btn" class="dict-close-btn">&times;</button>
+        <button id="dict-close-btn" class="dict-close-btn" aria-label="Close dictionary definition">&times;</button>
       </div>
       <div class="dict-badge-row">
         <span id="dict-pos" class="pos-badge">noun</span>

@@ -244,11 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateUI(settings) {
-    levelBtns.forEach(btn => btn.classList.remove('active'));
-    if (settings.level > 0) {
-      const activeBtn = document.querySelector(`[data-level="${settings.level}"]`);
-      if (activeBtn) activeBtn.classList.add('active');
-    }
+    levelBtns.forEach(btn => {
+      const isActive = parseInt(btn.dataset.level, 10) === settings.level;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
 
     fontSelect.value = settings.font || 'OpenDyslexic';
     fontColorSelect.value = settings.fontColor || 'default';
@@ -268,7 +268,9 @@ document.addEventListener('DOMContentLoaded', () => {
     rulerToggle.checked = Boolean(settings.ruler);
     rulerOptions.classList.toggle('hidden', !settings.ruler);
     rulerModeBtns.forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.rulerMode === (settings.rulerMode || 'bar'));
+      const isModeActive = btn.dataset.rulerMode === (settings.rulerMode || 'bar');
+      btn.classList.toggle('active', isModeActive);
+      btn.setAttribute('aria-checked', isModeActive ? 'true' : 'false');
     });
     rulerHeightSlider.value = settings.rulerHeight || 40;
 
@@ -285,4 +287,16 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  // Real-time synchronization when settings change from shortcuts or other tabs (Improvement 7)
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
+      const fresh = { ...DEFAULT_SETTINGS, ...changes.va_settings.newValue, tts: true, dictionary: true };
+      currentSettings = fresh;
+      masterToggle.checked = fresh.isActive !== false;
+      updateToggleUI(masterToggle.checked);
+      updateUI(fresh);
+    }
+  });
+
 });

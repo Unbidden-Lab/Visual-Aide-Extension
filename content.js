@@ -73,6 +73,15 @@ let currentSettings = {
 };
 
 let rulerEl = null;
+let rulerRafId = null;
+let lastMouseY = 0;
+let lastFocusedElement = null;
+
+// SpeechSynthesis chunk queue and heartbeat state
+let ttsQueue = [];
+let ttsActiveIndex = 0;
+let ttsHeartbeatTimer = null;
+let activeTtsBtn = null;
 let overlayEl = null;
 let actionBadge = null;
 let dictModal = null;
@@ -80,6 +89,23 @@ let currentUtterance = null;
 let bionicObserver = null;
 let bionicBatchRafId = null;
 const bionicDirtyRoots = new Set();
+
+function applyCssVariables() {
+  const root = document.documentElement;
+  if (!currentSettings.isActive) return;
+
+  if (currentSettings.font && currentSettings.font !== 'inherit') {
+    root.style.setProperty('--va-font-family', currentSettings.font);
+  } else {
+    root.style.removeProperty('--va-font-family');
+  }
+
+  root.style.setProperty('--va-tracking', String(currentSettings.tracking || 0) + 'px');
+  root.style.setProperty('--va-spacing', String(currentSettings.spacing || 0) + 'px');
+  root.style.setProperty('--va-leading', String(currentSettings.leading || 1.5));
+  root.style.setProperty('--va-paragraph-spacing', String(currentSettings.paragraphSpacing || 0) + 'px');
+  root.style.setProperty('--va-text-align', currentSettings.forceLeftAlign ? 'left' : 'inherit');
+}
 
 function setupStyleBlock() {
   let styleEl = document.getElementById('visual-aide-styles');
@@ -101,6 +127,7 @@ function setupStyleBlock() {
   }
 
   document.documentElement.classList.add('va-active');
+  applyCssVariables();
 
   const fontRule = (currentSettings.font && currentSettings.font !== 'inherit')
     ? `font-family: ${currentSettings.font} !important;`
@@ -140,7 +167,11 @@ function setupStyleBlock() {
         background-color: ${resolvedBg} !important;
         background-image: none !important;
       }
-      html.va-contrast-active :is(article, section, main, div:not([class*="icon"]):not(#visual-aide-overlay):not(#visual-aide-ruler):not(#va-action-badge):not(#va-dict-modal)) {
+      html.va-contrast-active :is(main, [role="main"], article, section) {
+        background-color: ${resolvedBg} !important;
+      }
+      /* Clean text background without breaking opaque cards or modals */
+      html.va-contrast-active :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd, span):not([class*="badge"]):not([class*="chip"]):not([class*="tag"]):not([class*="btn"]):not(button) {
         background-color: transparent !important;
       }
     `;
@@ -204,9 +235,9 @@ function setupStyleBlock() {
     html.va-active button,
     html.va-active input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
     html.va-active textarea {
-      ${fontRule}
-      ${trackingRule}
-      ${spacingRule}
+      font-family: var(--va-font-family, inherit) !important;
+      letter-spacing: var(--va-tracking, normal) !important;
+      word-spacing: var(--va-spacing, normal) !important;
     }
 
     /* Block text flow: line-height (leading), paragraph margins, and alignment */
@@ -221,9 +252,9 @@ function setupStyleBlock() {
     html.va-active td,
     html.va-active th,
     html.va-active label {
-      ${leadingRule}
-      ${paragraphSpacingRule}
-      ${leftAlignRule}
+      line-height: var(--va-leading, inherit) !important;
+      margin-bottom: var(--va-paragraph-spacing, 0px) !important;
+      text-align: var(--va-text-align, inherit) !important;
     }
 
     /* Headings line height and alignment */
@@ -459,9 +490,15 @@ function updateOverlay(opacity, colorKey) {
 // Reading Focus Guide (Ruler & Mask)
 // -------------------------------------------------------------
 function handleMouseMove(e) {
-  if (rulerEl && currentSettings.isActive && currentSettings.ruler) {
-    const height = currentSettings.rulerHeight || 40;
-    rulerEl.style.top = `${e.clientY - Math.floor(height / 2)}px`;
+  lastMouseY = e.clientY;
+  if (rulerRafId === null) {
+    rulerRafId = requestAnimationFrame(() => {
+      rulerRafId = null;
+      if (rulerEl && currentSettings.isActive && currentSettings.ruler) {
+        const height = currentSettings.rulerHeight || 40;
+        rulerEl.style.top = (lastMouseY - Math.floor(height / 2)) + 'px';
+      }
+    });
   }
 }
 
@@ -864,13 +901,13 @@ function showActionBadge(x, y, text) {
   const isSingleWord = !/\s/.test(text) && text.length < 30;
 
   let html = `
-    <button class="va-action-chip" id="va-tts-btn">🔊 Read</button>
+    <button class="va-action-chip" id="va-tts-btn" aria-label="Read selected text aloud">🔊 Read</button>
   `;
 
   if (currentSettings.dictionary && isSingleWord) {
     html += `
       <span class="va-chip-divider"></span>
-      <button class="va-action-chip" id="va-dict-btn">📖 Define</button>
+      <button class="va-action-chip" id="va-dict-btn" aria-label="Look up word in simplified dictionary">📖 Define</button>
     `;
   }
 
@@ -901,21 +938,102 @@ function showActionBadge(x, y, text) {
   }
 }
 
-function speakText(text, btnEl) {
-  if (!window.speechSynthesis) return;
+function chunkTextForTts(text) {
+  if (!text) return [];
+  const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+  const chunks = [];
+  let current = '';
+  for (let i = 0; i < sentences.length; i++) {
+    const s = sentences[i].trim();
+    if (!s) continue;
+    if ((current + ' ' + s).length > 180 && current) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current += (current ? ' ' : '') + s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
 
-  if (window.speechSynthesis.speaking) {
+function startTtsHeartbeat() {
+  stopTtsHeartbeat();
+  ttsHeartbeatTimer = setInterval(() => {
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    } else {
+      stopTtsHeartbeat();
+    }
+  }, 10000);
+}
+
+function stopTtsHeartbeat() {
+  if (ttsHeartbeatTimer) {
+    clearInterval(ttsHeartbeatTimer);
+    ttsHeartbeatTimer = null;
+  }
+}
+
+function stopTtsPlayback() {
+  if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
-    if (btnEl) btnEl.innerHTML = '🔊 Read';
+  }
+  stopTtsHeartbeat();
+  ttsQueue = [];
+  ttsActiveIndex = 0;
+  if (activeTtsBtn) {
+    activeTtsBtn.innerHTML = '🔊 Read';
+    activeTtsBtn.setAttribute('aria-label', 'Read selected text aloud');
+    activeTtsBtn = null;
+  }
+}
+
+function playNextTtsChunk() {
+  if (!window.speechSynthesis || ttsActiveIndex >= ttsQueue.length) {
+    stopTtsPlayback();
     return;
   }
 
-  if (btnEl) btnEl.innerHTML = '⏹ Stop';
-  currentUtterance = new SpeechSynthesisUtterance(text);
+  const chunk = ttsQueue[ttsActiveIndex];
+  currentUtterance = new SpeechSynthesisUtterance(chunk);
   currentUtterance.rate = 0.95;
-  currentUtterance.onend = () => { if (btnEl) btnEl.innerHTML = '🔊 Read'; };
-  currentUtterance.onerror = () => { if (btnEl) btnEl.innerHTML = '🔊 Read'; };
+
+  currentUtterance.onend = () => {
+    ttsActiveIndex++;
+    playNextTtsChunk();
+  };
+
+  currentUtterance.onerror = (err) => {
+    console.warn('TTS chunk error:', err);
+    stopTtsPlayback();
+  };
+
   window.speechSynthesis.speak(currentUtterance);
+}
+
+function speakText(text, btnEl) {
+  if (!window.speechSynthesis) return;
+
+  if (window.speechSynthesis.speaking || ttsQueue.length > 0) {
+    stopTtsPlayback();
+    return;
+  }
+
+  const chunks = chunkTextForTts(text);
+  if (chunks.length === 0) return;
+
+  activeTtsBtn = btnEl;
+  if (btnEl) {
+    btnEl.innerHTML = '⏹ Stop';
+    btnEl.setAttribute('aria-label', 'Stop read aloud playback');
+  }
+
+  ttsQueue = chunks;
+  ttsActiveIndex = 0;
+  startTtsHeartbeat();
+  playNextTtsChunk();
 }
 
 function removeActionBadge() {
@@ -931,21 +1049,36 @@ async function openInPageDictionary(word, x, y) {
   if (!dictModal) {
     dictModal = document.createElement('div');
     dictModal.id = 'va-dict-modal';
+    dictModal.setAttribute('role', 'dialog');
+    dictModal.setAttribute('aria-modal', 'true');
+    dictModal.setAttribute('aria-labelledby', 'va-modal-title');
     document.body.appendChild(dictModal);
   }
 
-  // Position nicely near the clicked point
-  const posX = Math.max(16, Math.min(window.innerWidth - 360, x));
-  const posY = Math.min(window.innerHeight - 240, y - window.scrollY);
+  lastFocusedElement = document.activeElement;
 
-  dictModal.style.left = `${posX}px`;
-  dictModal.style.top = `${posY}px`;
+  // Viewport-relative clamping to prevent clipping off screen edges
+  const modalWidth = 340;
+  const modalHeight = 250;
+  const clientX = x - window.scrollX;
+  const clientY = y - window.scrollY;
+
+  let posX = Math.max(16, Math.min(window.innerWidth - modalWidth - 16, clientX));
+  let posY = clientY + 12;
+
+  // If opening below would overflow bottom of viewport, position above
+  if (posY + modalHeight > window.innerHeight - 16) {
+    posY = Math.max(16, clientY - modalHeight - 12);
+  }
+
+  dictModal.style.left = posX + 'px';
+  dictModal.style.top = posY + 'px';
   dictModal.style.display = 'block';
 
   dictModal.innerHTML = `
     <div class="va-modal-header">
-      <h4 class="va-modal-title">${word}</h4>
-      <button class="va-modal-close" id="va-dict-close">&times;</button>
+      <h4 class="va-modal-title" id="va-modal-title">${word}</h4>
+      <button class="va-modal-close" id="va-dict-close" aria-label="Close dictionary definition">&times;</button>
     </div>
     <div class="va-def-text">Searching simplified definition...</div>
   `;
@@ -953,52 +1086,23 @@ async function openInPageDictionary(word, x, y) {
   document.getElementById('va-dict-close').onclick = removeDictModal;
 
   let entry = null;
-
-  // 1. Instant check against local offline database with stems
   const clean = word.toLowerCase().replace(/[^a-z0-9'-]/g, '').trim();
-  const stems = (typeof getStemCandidates === 'function') ? getStemCandidates(clean) : [clean];
-  for (const stem of stems) {
-    if (typeof SIMPLIFIED_OFFLINE_DB !== 'undefined' && SIMPLIFIED_OFFLINE_DB[stem]) {
-      const item = SIMPLIFIED_OFFLINE_DB[stem];
-      entry = {
-        word: clean,
-        rootWord: stem !== clean ? stem : '',
-        pos: item.pos,
-        definition: item.def,
-        synonyms: item.synonyms || [],
-        example: item.example || '',
-        source: 'offline'
-      };
-      break;
-    }
-  }
 
-  // 2. If not offline, query background service worker (bypasses page CSP and has strict 2.5s timeout)
-  if (!entry) {
-    try {
-      entry = await new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve(null), 3000);
-        chrome.runtime.sendMessage({ action: 'lookup_word', word: clean }, (resp) => {
-          clearTimeout(timeout);
-          if (chrome.runtime.lastError || !resp) {
-            resolve(null);
-          } else {
-            resolve(resp);
-          }
-        });
+  // Route query through background service worker (CSP-safe, uses shared offline cache)
+  try {
+    entry = await new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 3000);
+      chrome.runtime.sendMessage({ action: 'lookup_word', word: clean }, (resp) => {
+        clearTimeout(timeout);
+        if (chrome.runtime.lastError || !resp) {
+          resolve(null);
+        } else {
+          resolve(resp);
+        }
       });
-    } catch (e) {
-      entry = null;
-    }
-  }
-
-  // 3. Fallback to direct lookup if background didn't return
-  if (!entry && typeof lookupSimplifiedWord === 'function') {
-    try {
-      entry = await lookupSimplifiedWord(clean);
-    } catch (e) {
-      entry = null;
-    }
+    });
+  } catch (e) {
+    entry = null;
   }
 
   if (entry) {
@@ -1017,10 +1121,10 @@ async function openInPageDictionary(word, x, y) {
     dictModal.innerHTML = `
       <div class="va-modal-header">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <h4 class="va-modal-title">${entry.word}</h4>
-          <button class="va-action-chip" id="va-word-speak" style="padding: 2px 6px;">🔊</button>
+          <h4 class="va-modal-title" id="va-modal-title">${entry.word}</h4>
+          <button class="va-action-chip" id="va-word-speak" style="padding: 2px 6px;" aria-label="Pronounce ${entry.word}">🔊</button>
         </div>
-        <button class="va-modal-close" id="va-dict-close">&times;</button>
+        <button class="va-modal-close" id="va-dict-close" aria-label="Close dictionary definition">&times;</button>
       </div>
       <div class="va-modal-badges">
         <span class="va-badge">${entry.pos || 'term'}</span>
@@ -1041,18 +1145,29 @@ async function openInPageDictionary(word, x, y) {
   } else {
     dictModal.innerHTML = `
       <div class="va-modal-header">
-        <h4 class="va-modal-title">${word}</h4>
-        <button class="va-modal-close" id="va-dict-close">&times;</button>
+        <h4 class="va-modal-title" id="va-modal-title">${word}</h4>
+        <button class="va-modal-close" id="va-dict-close" aria-label="Close dictionary definition">&times;</button>
       </div>
       <div class="va-def-text">A simple definition for "${word}" could not be found.</div>
     `;
     document.getElementById('va-dict-close').onclick = removeDictModal;
   }
+
+  // Focus close button for keyboard accessibility
+  setTimeout(() => {
+    document.getElementById('va-dict-close')?.focus();
+  }, 50);
 }
 
 function removeDictModal() {
   if (dictModal) {
     dictModal.style.display = 'none';
+  }
+  if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+    try {
+      lastFocusedElement.focus();
+    } catch (e) {}
+    lastFocusedElement = null;
   }
 }
 
@@ -1107,3 +1222,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 boot();
+// Dismiss modals, popovers, and badges on Escape (Improvement 5)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (dictModal && dictModal.style.display !== 'none') {
+      removeDictModal();
+    } else if (actionBadge && actionBadge.style.display !== 'none') {
+      removeActionBadge();
+    }
+  }
+});
