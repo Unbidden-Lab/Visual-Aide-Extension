@@ -521,29 +521,26 @@ function loadSampleDocument() {
   displayExtractedPages('Dyslexia Accessibility Guide');
 }
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function applyBionicToParagraph(text) {
-  const tokens = text.split(/(\s+)/);
-  let html = '';
-  for (const token of tokens) {
-    if (!token) continue;
-    if (/^\s+$/.test(token)) {
-      html += token;
-    } else {
-      const match = token.match(/^([^\w\d]*)([\w\d]+)(.*)$/i);
-      if (match) {
-        const prefix = match[1];
-        const word = match[2];
-        const suffix = match[3];
-        const half = Math.ceil(word.length * 0.45) || 1;
-        const boldPart = word.slice(0, half);
-        const restPart = word.slice(half);
-        html += `${prefix}<b class="va-bionic-fix">${boldPart}</b>${restPart}${suffix}`;
-      } else {
-        html += token;
-      }
+  if (!text) return '';
+  return text.replace(/([a-zA-Z0-9]+(?:['’][a-zA-Z0-9]+)?)|([^a-zA-Z0-9'’]+)/g, (fullMatch, word, nonWord) => {
+    if (word) {
+      const half = Math.ceil(word.length * 0.45) || 1;
+      const boldPart = word.slice(0, half);
+      const restPart = word.slice(half);
+      return `<b class="va-bionic-fix">${escapeHtml(boldPart)}</b>${escapeHtml(restPart)}`;
     }
-  }
-  return html;
+    return escapeHtml(nonWord || '');
+  });
 }
 
 // -------------------------------------------------------------

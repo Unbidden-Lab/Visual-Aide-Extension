@@ -78,6 +78,8 @@ let actionBadge = null;
 let dictModal = null;
 let currentUtterance = null;
 let bionicObserver = null;
+let bionicBatchRafId = null;
+const bionicDirtyRoots = new Set();
 
 function setupStyleBlock() {
   let styleEl = document.getElementById('visual-aide-styles');
@@ -163,7 +165,7 @@ function setupStyleBlock() {
     document.documentElement.classList.add('va-font-color-active');
     fontColorRules = `
       html.va-font-color-active body,
-      html.va-font-color-active :is(p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, dt, dd, blockquote, label, button, input:not([type="checkbox"]):not([type="radio"]), textarea):not([class*="icon"]):not([class*="fa"]):not([class*="material"]):not(svg *) {
+      html.va-font-color-active :is(p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, dt, dd, blockquote, label, button, b, strong, .va-bionic-fix, input:not([type="checkbox"]):not([type="radio"]), textarea):not([class*="icon"]):not([class*="fa"]):not([class*="material"]):not(svg *) {
         color: ${resolvedFontColor} !important;
         -webkit-text-fill-color: ${resolvedFontColor} !important;
       }
@@ -277,6 +279,8 @@ function setupStyleBlock() {
     .va-bionic-fix {
       font-weight: 700 !important;
       opacity: 1 !important;
+      color: inherit !important;
+      -webkit-text-fill-color: inherit !important;
     }
 
     /* Floating Action Badge (TTS & Define) */
@@ -508,74 +512,275 @@ function updateRuler(enabled, mode = 'bar', height = 40) {
 }
 
 // -------------------------------------------------------------
-// Bionic Reading (Saccadic Reading Anchor)
+// Bionic Reading (Saccadic Reading Anchor for Static & Dynamic SPAs)
 // -------------------------------------------------------------
+const BIONIC_EXCLUDED_TAGS = new Set([
+  'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'IFRAME', 'OBJECT',
+  'EMBED', 'CANVAS', 'SVG', 'AUDIO', 'VIDEO', 'CODE', 'PRE',
+  'KBD', 'SAMP', 'VAR', 'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'MATH'
+]);
+
+const BIONIC_EXCLUDED_SELECTOR = [
+  '[contenteditable="true"]',
+  '[contenteditable=""]',
+  '[role="textbox"]',
+  '[role="combobox"]',
+  '[data-lexical-editor="true"]',
+  'code',
+  'pre',
+  'kbd',
+  'samp',
+  '#visual-aide-overlay',
+  '#visual-aide-ruler',
+  '#va-action-badge',
+  '#va-dict-modal',
+  '#visual-aide-styles'
+].join(', ');
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function processTextForBionic(text) {
-  const tokens = text.split(/(\s+)/);
-  let html = '';
-  for (const token of tokens) {
-    if (!token) continue;
-    if (/^\s+$/.test(token)) {
-      html += token;
-    } else {
-      const match = token.match(/^([^\w\d]*)([\w\d]+)(.*)$/i);
-      if (match) {
-        const prefix = match[1];
-        const word = match[2];
-        const suffix = match[3];
-        const half = Math.ceil(word.length * 0.45) || 1;
-        const boldPart = word.slice(0, half);
-        const restPart = word.slice(half);
-        html += `${prefix}<b class="va-bionic-fix">${boldPart}</b>${restPart}${suffix}`;
-      } else {
-        html += token;
+  if (!text) return '';
+  return text.replace(/([a-zA-Z0-9]+(?:['’][a-zA-Z0-9]+)?)|([^a-zA-Z0-9'’]+)/g, (fullMatch, word, nonWord) => {
+    if (word) {
+      const half = Math.ceil(word.length * 0.45) || 1;
+      const boldPart = word.slice(0, half);
+      const restPart = word.slice(half);
+      return `<b class="va-bionic-fix">${escapeHtml(boldPart)}</b>${escapeHtml(restPart)}`;
+    }
+    return escapeHtml(nonWord || '');
+  });
+}
+
+function isElementExcludedFromBionic(el) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return true;
+
+  if (BIONIC_EXCLUDED_TAGS.has(el.tagName)) return true;
+
+  if (el.classList.contains('va-bionic-applied') || el.classList.contains('va-bionic-fix')) {
+    return true;
+  }
+
+  if (el.isContentEditable) return true;
+  if (el.getAttribute('contenteditable') === 'true' || el.getAttribute('contenteditable') === '') return true;
+  if (el.getAttribute('role') === 'textbox' || el.getAttribute('role') === 'combobox') return true;
+
+  if (el.closest(BIONIC_EXCLUDED_SELECTOR)) {
+    return true;
+  }
+
+  // Protect icon fonts and icon elements
+  const cls = (typeof el.className === 'string') ? el.className : '';
+  if (
+    cls.includes('icon') ||
+    cls.includes('material-') ||
+    cls.includes('fa-') ||
+    cls.includes('glyphicon') ||
+    cls.includes('bi-') ||
+    cls.includes('ri-') ||
+    el.hasAttribute('data-icon')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function bionifySubtree(root) {
+  if (!root || !root.isConnected) return;
+
+  if (root.nodeType === Node.ELEMENT_NODE && isElementExcludedFromBionic(root)) {
+    return;
+  }
+
+  const candidateTextNodes = [];
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        if (!node.nodeValue || !/[a-zA-Z0-9]{2,}/.test(node.nodeValue)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        if (isElementExcludedFromBionic(parent)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        if (parent.closest('.va-bionic-applied, .va-bionic-fix')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  let currentNode;
+  while ((currentNode = walker.nextNode())) {
+    candidateTextNodes.push(currentNode);
+  }
+
+  for (const textNode of candidateTextNodes) {
+    if (!textNode.isConnected) continue;
+    const parent = textNode.parentElement;
+    if (!parent || parent.closest('.va-bionic-applied, .va-bionic-fix')) continue;
+    if (isElementExcludedFromBionic(parent)) continue;
+
+    const origText = textNode.nodeValue;
+    if (!origText || !/[a-zA-Z0-9]{2,}/.test(origText)) continue;
+
+    const span = document.createElement('span');
+    span.className = 'va-bionic-applied';
+    span.dataset.origText = origText;
+    span.innerHTML = processTextForBionic(origText);
+    textNode.replaceWith(span);
+  }
+}
+
+function consolidateBionicRoots(nodeSet) {
+  const nodes = Array.from(nodeSet).filter(node => node && node.isConnected);
+  if (nodes.length <= 1) return nodes;
+
+  if (nodes.some(n => n === document.body || n === document.documentElement)) {
+    return [document.body];
+  }
+
+  const result = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    let isContained = false;
+    for (let j = 0; j < nodes.length; j++) {
+      if (i !== j && nodes[j].contains(node)) {
+        isContained = true;
+        break;
+      }
+    }
+    if (!isContained) {
+      result.push(node);
+    }
+  }
+  return result;
+}
+
+function processBionicBatch() {
+  bionicBatchRafId = null;
+  if (!currentSettings.isActive || !currentSettings.bionic || !document.body) {
+    bionicDirtyRoots.clear();
+    return;
+  }
+
+  // Temporarily disconnect observer to prevent self-triggering
+  if (bionicObserver) {
+    bionicObserver.disconnect();
+  }
+
+  try {
+    const roots = consolidateBionicRoots(bionicDirtyRoots);
+    bionicDirtyRoots.clear();
+
+    for (const root of roots) {
+      bionifySubtree(root);
+    }
+  } finally {
+    // Re-attach observer to resume monitoring client-side mutations
+    if (bionicObserver && currentSettings.isActive && currentSettings.bionic && document.body) {
+      bionicObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    }
+  }
+}
+
+function scheduleBionicBatch(targetNode) {
+  if (targetNode) {
+    bionicDirtyRoots.add(targetNode);
+  }
+
+  if (bionicBatchRafId !== null) return;
+
+  bionicBatchRafId = requestAnimationFrame(processBionicBatch);
+}
+
+function handleBionicMutations(mutations) {
+  if (!currentSettings.isActive || !currentSettings.bionic) return;
+
+  let hasRelevantMutations = false;
+
+  for (let i = 0; i < mutations.length; i++) {
+    const mutation = mutations[i];
+    const target = mutation.target;
+    if (!target) continue;
+
+    if (target.nodeType === Node.ELEMENT_NODE && isElementExcludedFromBionic(target)) {
+      continue;
+    }
+
+    if (mutation.type === 'childList') {
+      const added = mutation.addedNodes;
+      for (let j = 0; j < added.length; j++) {
+        const node = added[j];
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          if (!isElementExcludedFromBionic(node)) {
+            bionicDirtyRoots.add(node);
+            hasRelevantMutations = true;
+          }
+        } else if (node.nodeType === Node.TEXT_NODE) {
+          const parent = node.parentElement;
+          if (parent && !isElementExcludedFromBionic(parent)) {
+            bionicDirtyRoots.add(parent);
+            hasRelevantMutations = true;
+          }
+        }
+      }
+
+      if (mutation.removedNodes.length > 0 && target.nodeType === Node.ELEMENT_NODE) {
+        if (!isElementExcludedFromBionic(target)) {
+          bionicDirtyRoots.add(target);
+          hasRelevantMutations = true;
+        }
+      }
+    } else if (mutation.type === 'characterData') {
+      const parent = target.parentElement;
+      if (parent) {
+        const bionicWrapper = parent.closest('.va-bionic-applied');
+        if (bionicWrapper && bionicWrapper.parentElement) {
+          bionicDirtyRoots.add(bionicWrapper.parentElement);
+          hasRelevantMutations = true;
+        } else if (!isElementExcludedFromBionic(parent)) {
+          bionicDirtyRoots.add(parent);
+          hasRelevantMutations = true;
+        }
       }
     }
   }
-  return html;
-}
 
-function bionifyElement(el) {
-  if (!el || el.dataset.vaBionified) return;
-  el.dataset.vaBionified = 'true';
-
-  const childNodes = Array.from(el.childNodes);
-  for (const node of childNodes) {
-    if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.trim().length > 0) {
-      const span = document.createElement('span');
-      span.className = 'va-bionic-applied';
-      span.dataset.origText = node.nodeValue;
-      span.innerHTML = processTextForBionic(node.nodeValue);
-      node.replaceWith(span);
-    }
+  if (hasRelevantMutations) {
+    scheduleBionicBatch();
   }
 }
 
 function applyBionicReading() {
   if (!document.body) return;
-  const elements = document.querySelectorAll(
-    'p, article p, section p, li, blockquote, dd, dt, h1, h2, h3, h4, h5, h6'
-  );
-  elements.forEach(bionifyElement);
 
   if (!bionicObserver) {
-    bionicObserver = new MutationObserver((mutations) => {
-      if (!currentSettings.isActive || !currentSettings.bionic) return;
-      for (const mutation of mutations) {
-        for (const added of mutation.addedNodes) {
-          if (added.nodeType === Node.ELEMENT_NODE) {
-            if (added.matches && added.matches('p, li, blockquote, h1, h2, h3, h4, h5, h6')) {
-              bionifyElement(added);
-            }
-            if (added.querySelectorAll) {
-              added.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6').forEach(bionifyElement);
-            }
-          }
-        }
-      }
-    });
-    bionicObserver.observe(document.body, { childList: true, subtree: true });
+    bionicObserver = new MutationObserver(handleBionicMutations);
   }
+
+  scheduleBionicBatch(document.body);
+  initSpaNavigation();
 }
 
 function removeBionicReading() {
@@ -583,6 +788,12 @@ function removeBionicReading() {
     bionicObserver.disconnect();
     bionicObserver = null;
   }
+
+  if (bionicBatchRafId !== null) {
+    cancelAnimationFrame(bionicBatchRafId);
+    bionicBatchRafId = null;
+  }
+  bionicDirtyRoots.clear();
 
   document.querySelectorAll('.va-bionic-applied').forEach((span) => {
     const text = span.dataset.origText || span.textContent;
@@ -597,6 +808,20 @@ function removeBionicReading() {
   document.querySelectorAll('[data-va-bionified]').forEach((el) => {
     delete el.dataset.vaBionified;
   });
+}
+
+function initSpaNavigation() {
+  if (window.__vaSpaInitialized) return;
+  window.__vaSpaInitialized = true;
+
+  const handleSpaTransition = () => {
+    if (currentSettings.isActive && currentSettings.bionic && document.body) {
+      scheduleBionicBatch(document.body);
+    }
+  };
+
+  window.addEventListener('popstate', handleSpaTransition);
+  window.addEventListener('hashchange', handleSpaTransition);
 }
 
 // -------------------------------------------------------------
