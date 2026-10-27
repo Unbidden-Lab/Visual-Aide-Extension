@@ -17,9 +17,6 @@
   "host_permissions": [
     "<all_urls>"
   ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; worker-src 'self' blob:; object-src 'self'"
-  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Visual Aide",
