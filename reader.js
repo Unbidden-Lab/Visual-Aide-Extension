@@ -665,9 +665,9 @@ function displayExtractedPages(docTitle) {
     const bottomNav = document.createElement('div');
     bottomNav.className = 'reader-pagination-bar';
     bottomNav.innerHTML = `
-      <button class="reader-page-btn" id="bottom-page-prev" ${currentReaderPageIndex <= 1 ? 'disabled' : ''} aria-label="Go to previous page">◀ Previous Page</button>
+      <button class="reader-page-btn" id="bottom-page-prev" ${currentReaderPageIndex <= 1 ? 'disabled' : ''} aria-label="Go to previous page">Previous Page</button>
       <span class="reader-page-counter">Page ${currentReaderPageIndex} of ${totalPages}</span>
-      <button class="reader-page-btn" id="bottom-page-next" ${currentReaderPageIndex >= totalPages ? 'disabled' : ''} aria-label="Go to next page">Next Page ▶</button>
+      <button class="reader-page-btn" id="bottom-page-next" ${currentReaderPageIndex >= totalPages ? 'disabled' : ''} aria-label="Go to next page">Next Page</button>
     `;
     docContainer.appendChild(bottomNav);
 

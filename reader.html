@@ -12,15 +12,14 @@
   <header class="reader-header">
     <div class="header-top">
       <div class="brand">
-        <span class="logo-icon">👁️</span>
         <h1>VISUAL AIDE <span class="badge-tag">PDF READER</span></h1>
       </div>
       <div class="header-controls">
         <span id="network-status" class="status-badge online" title="Network status">
           <span class="dot"></span> <span id="network-text">Online Mode</span>
         </span>
-        <button id="upload-nav-btn" class="action-btn">📂 Open PDF</button>
-        <button id="print-btn" class="action-btn" title="Print with current typography">🖨️ Print</button>
+        <button id="upload-nav-btn" class="action-btn">Open PDF</button>
+        <button id="print-btn" class="action-btn" title="Print with current typography">Print</button>
       </div>
     </div>
 
@@ -121,8 +120,8 @@
         <div class="tool-item tts-player">
           <label>Read Aloud</label>
           <div class="btn-group">
-            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud" aria-label="Play text-to-speech">▶ Play</button>
-            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading" aria-label="Stop text-to-speech">⏹ Stop</button>
+            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud" aria-label="Play text-to-speech">Play</button>
+            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading" aria-label="Stop text-to-speech">Stop</button>
           </div>
         </div>
 
@@ -130,9 +129,9 @@
         <div class="tool-item page-nav" id="reader-page-nav" style="display: none;">
           <label>Page</label>
           <div class="btn-group">
-            <button id="reader-page-prev" class="tool-btn icon-btn" title="Previous page" aria-label="Go to previous page" disabled>◀</button>
+            <button id="reader-page-prev" class="tool-btn icon-btn" title="Previous page" aria-label="Go to previous page" disabled>&lsaquo;</button>
             <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
-            <button id="reader-page-next" class="tool-btn icon-btn" title="Next page" aria-label="Go to next page">▶</button>
+            <button id="reader-page-next" class="tool-btn icon-btn" title="Next page" aria-label="Go to next page">&rsaquo;</button>
           </div>
         </div>
 
@@ -141,7 +140,7 @@
           <label for="dict-search-input">Simplified Dict</label>
           <div class="input-with-btn">
             <input type="text" id="dict-search-input" placeholder="Look up word...">
-            <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">📖</button>
+            <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
           </div>
         </div>
       </div>
@@ -154,16 +153,15 @@
     <!-- Upload Hero Dropzone (visible when no file is loaded) -->
     <section id="upload-hero" class="upload-hero">
       <div class="drop-card" id="drop-zone">
-        <div class="drop-icon">📑</div>
         <h2>Accessible PDF Reader</h2>
         <p class="hero-desc">Open any downloaded or online PDF file. Read comfortably with dyslexia-friendly typefaces, custom word and line spacing, Irlen contrast tints, bionic reading, and full offline accessibility.</p>
 
         <div class="drop-actions">
           <label class="file-browse-btn">
-            📂 Choose PDF Document
+            Choose PDF Document
             <input type="file" id="file-input" accept=".pdf,application/pdf">
           </label>
-          <button id="load-sample-btn" class="sample-btn">💡 Load Sample Dyslexia Guide</button>
+          <button id="load-sample-btn" class="sample-btn">Load Sample Dyslexia Guide</button>
         </div>
 
         <div class="online-offline-notice">
@@ -196,7 +194,7 @@
         <div class="dict-word-group">
           <h3 id="dict-word">Word</h3>
           <span id="dict-phonetic" class="dict-phonetic"></span>
-          <button id="dict-tts-btn" class="dict-audio-btn" title="Pronounce word" aria-label="Pronounce word">🔊</button>
+          <button id="dict-tts-btn" class="dict-audio-btn" title="Pronounce word" aria-label="Pronounce word">Listen</button>
         </div>
         <button id="dict-close-btn" class="dict-close-btn" aria-label="Close dictionary definition">&times;</button>
       </div>

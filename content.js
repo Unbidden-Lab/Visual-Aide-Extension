@@ -901,13 +901,13 @@ function showActionBadge(x, y, text) {
   const isSingleWord = !/\s/.test(text) && text.length < 30;
 
   let html = `
-    <button class="va-action-chip" id="va-tts-btn" aria-label="Read selected text aloud">🔊 Read</button>
+    <button class="va-action-chip" id="va-tts-btn" aria-label="Read selected text aloud">Read</button>
   `;
 
   if (currentSettings.dictionary && isSingleWord) {
     html += `
       <span class="va-chip-divider"></span>
-      <button class="va-action-chip" id="va-dict-btn" aria-label="Look up word in simplified dictionary">📖 Define</button>
+      <button class="va-action-chip" id="va-dict-btn" aria-label="Look up word in simplified dictionary">Define</button>
     `;
   }
 
@@ -984,7 +984,7 @@ function stopTtsPlayback() {
   ttsQueue = [];
   ttsActiveIndex = 0;
   if (activeTtsBtn) {
-    activeTtsBtn.innerHTML = '🔊 Read';
+    activeTtsBtn.innerHTML = 'Read';
     activeTtsBtn.setAttribute('aria-label', 'Read selected text aloud');
     activeTtsBtn = null;
   }
@@ -1026,7 +1026,7 @@ function speakText(text, btnEl) {
 
   activeTtsBtn = btnEl;
   if (btnEl) {
-    btnEl.innerHTML = '⏹ Stop';
+    btnEl.innerHTML = 'Stop';
     btnEl.setAttribute('aria-label', 'Stop read aloud playback');
   }
 
@@ -1122,7 +1122,7 @@ async function openInPageDictionary(word, x, y) {
       <div class="va-modal-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <h4 class="va-modal-title" id="va-modal-title">${entry.word}</h4>
-          <button class="va-action-chip" id="va-word-speak" style="padding: 2px 6px;" aria-label="Pronounce ${entry.word}">🔊</button>
+          <button class="va-action-chip" id="va-word-speak" style="padding: 2px 6px;" aria-label="Pronounce ${entry.word}">Pronounce</button>
         </div>
         <button class="va-modal-close" id="va-dict-close" aria-label="Close dictionary definition">&times;</button>
       </div>
