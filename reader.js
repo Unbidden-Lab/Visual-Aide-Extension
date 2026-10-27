@@ -3,9 +3,22 @@
  * Complete offline & online support for reading downloaded documents and PDFs.
  */
 
-// Configure PDF.js Worker to local bundled worker
+// Configure PDF.js Worker to local bundled worker with bulletproof main-thread fallback
 if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+  if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+    } catch (e) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+    }
+  } else {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+  }
+
+  // Pre-wire main thread fallback to eliminate worker IPC hang/CSP failure
+  if (typeof window !== 'undefined' && window.pdfjsWorker && pdfjsLib.PDFWorker) {
+    pdfjsLib.PDFWorker._mainThreadWorkerMessageHandler = window.pdfjsWorker.WorkerMessageHandler;
+  }
 }
 
 const SAMPLE_TEXT = `
@@ -41,11 +54,23 @@ let currentReaderSettings = {
 
 let currentPdfDocument = null;
 let currentLoadedPages = [];
-    currentReaderPageIndex = 1;
-let ttsUtterance = null;
 let currentReaderPageIndex = 1;
+let currentTotalPages = 1;
 let currentDocumentTitle = 'Document';
+let ttsUtterance = null;
 let readerLastFocusedEl = null;
+
+function showReaderLoading(message) {
+  const overlay = document.getElementById('reader-loading-overlay');
+  const msgEl = document.getElementById('reader-loading-msg');
+  if (msgEl && message) msgEl.textContent = message;
+  if (overlay) overlay.classList.remove('hidden');
+}
+
+function hideReaderLoading() {
+  const overlay = document.getElementById('reader-loading-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
 
 // Throttled mouse tracking state
 let readerRulerRafId = null;
@@ -381,74 +406,157 @@ function initDropZone() {
   const fileInput = document.getElementById('file-input');
   const loadSampleBtn = document.getElementById('load-sample-btn');
 
-  dropZone.addEventListener('dragover', (e) => {
+  // Support drag-and-drop on drop zone as well as whole window
+  window.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('dragover');
+    if (dropZone) dropZone.classList.add('dragover');
   });
 
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
+  window.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget === null && dropZone) {
+      dropZone.classList.remove('dragover');
+    }
   });
 
-  dropZone.addEventListener('drop', (e) => {
+  window.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (dropZone) dropZone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleIncomingFile(e.dataTransfer.files[0]);
     }
   });
 
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleIncomingFile(e.target.files[0]);
-    }
-  });
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleIncomingFile(e.target.files[0]);
+      }
+    });
+  }
 
-  loadSampleBtn.addEventListener('click', () => {
-    loadSampleDocument();
-  });
+  if (loadSampleBtn) {
+    loadSampleBtn.addEventListener('click', () => {
+      loadSampleDocument();
+    });
+  }
 }
 
 function handleIncomingFile(file) {
   if (!file) return;
 
-  const fileName = file.name.toLowerCase();
-  if (fileName.endsWith('.pdf') || file.type === 'application/pdf') {
-    const reader = new FileReader();
-    reader.onload = function () {
-      processPdfData(new Uint8Array(this.result), file.name);
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    alert('Please choose a PDF document (.pdf).');
+  const fileName = file.name ? file.name.toLowerCase() : '';
+  const isPdf = fileName.endsWith('.pdf') ||
+                (file.type && file.type.includes('pdf')) ||
+                (!file.type && file.size > 0);
+
+  if (!isPdf) {
+    alert('Please choose a valid PDF document (.pdf).');
+    const input = document.getElementById('file-input');
+    if (input) input.value = '';
+    return;
   }
+
+  showReaderLoading(`Reading ${file.name || 'document'}...`);
+
+  const fileReader = new FileReader();
+  fileReader.onload = function () {
+    try {
+      const typedArray = new Uint8Array(this.result);
+      processPdfData(typedArray, file.name || 'Document.pdf');
+    } catch (err) {
+      console.error('Error preparing PDF data:', err);
+      hideReaderLoading();
+      alert('Failed to read the PDF file. Please try again.');
+    } finally {
+      const input = document.getElementById('file-input');
+      if (input) input.value = '';
+    }
+  };
+
+  fileReader.onerror = function (err) {
+    console.error('FileReader error:', err);
+    hideReaderLoading();
+    alert('Error reading file from disk. Please check file permissions and try again.');
+    const input = document.getElementById('file-input');
+    if (input) input.value = '';
+  };
+
+  fileReader.readAsArrayBuffer(file);
 }
 
 // -------------------------------------------------------------
-// PDF Text Extraction (via PDF.js)
+// PDF Text Extraction & Progressive Rendering
 // -------------------------------------------------------------
-async function processPdfData(typedArray, fileName) {
+async function extractPageData(pageNum) {
+  if (currentLoadedPages[pageNum - 1]) {
+    return currentLoadedPages[pageNum - 1];
+  }
+
+  if (!currentPdfDocument) {
+    return {
+      pageNumber: pageNum,
+      paragraphs: ['[Document not loaded]']
+    };
+  }
+
   try {
-    const loadingTask = pdfjsLib.getDocument({ data: typedArray });
-    currentPdfDocument = await loadingTask.promise;
+    const page = await currentPdfDocument.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const paragraphs = formatPdfTextToParagraphs(textContent.items);
 
-    currentLoadedPages = [];
+    const pageData = {
+      pageNumber: pageNum,
+      paragraphs: paragraphs.length > 0 ? paragraphs : ['[No extractable text found on this page]']
+    };
 
-    for (let pageNum = 1; pageNum <= currentPdfDocument.numPages; pageNum++) {
-      const page = await currentPdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const paragraphs = formatPdfTextToParagraphs(textContent.items);
+    currentLoadedPages[pageNum - 1] = pageData;
+    return pageData;
+  } catch (err) {
+    console.warn(`Error extracting text for page ${pageNum}:`, err);
+    return {
+      pageNumber: pageNum,
+      paragraphs: ['[Could not extract text from this page]']
+    };
+  }
+}
 
-      currentLoadedPages.push({
-        pageNumber: pageNum,
-        paragraphs: paragraphs.length > 0 ? paragraphs : ['[No extractable text on this page]']
-      });
-    }
+async function processPdfData(typedArray, fileName) {
+  showReaderLoading('Parsing PDF structure...');
 
+  try {
+    // 12-second safety timeout so it never hangs indefinitely
+    const loadingTask = pdfjsLib.getDocument({
+      data: typedArray,
+      isEvalSupported: false
+    });
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('PDF loading timed out.')), 12000);
+    });
+
+    currentPdfDocument = await Promise.race([loadingTask.promise, timeoutPromise]);
+    currentTotalPages = currentPdfDocument.numPages || 1;
+    currentLoadedPages = new Array(currentTotalPages);
+    currentReaderPageIndex = 1;
+
+    showReaderLoading(`Loading Page 1 of ${currentTotalPages}...`);
+
+    // Extract Page 1 immediately for instant display
+    await extractPageData(1);
+
+    hideReaderLoading();
     displayExtractedPages(fileName || 'Document.pdf');
+
+    // Preload Page 2 in background if multi-page
+    if (currentTotalPages > 1) {
+      setTimeout(() => {
+        extractPageData(2).catch(() => {});
+      }, 80);
+    }
   } catch (err) {
     console.error('PDF parsing error:', err);
-    alert('Could not parse PDF. Ensure it is a valid PDF document.');
+    hideReaderLoading();
+    alert('Could not open or parse this PDF document. Please make sure it is a valid, uncorrupted PDF file.');
   }
 }
 
@@ -467,9 +575,18 @@ function formatPdfTextToParagraphs(items) {
         currentPara = '';
       }
     } else {
-      currentPara += (currentPara ? ' ' : '') + str;
+      const cleanStr = str.trim();
+      if (cleanStr) {
+        if (currentPara.length > 0) {
+          if (!/\s$/.test(currentPara) && !/^\s/.test(str)) {
+            currentPara += ' ';
+          }
+        }
+        currentPara += cleanStr;
+      }
+
       if (item.hasEOL) {
-        if (currentPara.length > 120 || /[.!?]$/.test(currentPara.trim())) {
+        if (currentPara.length > 140 || /[.!?]$/.test(currentPara.trim())) {
           paragraphs.push(currentPara.trim());
           currentPara = '';
         }
@@ -485,16 +602,18 @@ function formatPdfTextToParagraphs(items) {
 }
 
 // -------------------------------------------------------------
-// Document Rendering & Bionic Transform
+// Document Rendering & Pagination
 // -------------------------------------------------------------
 function displayExtractedPages(docTitle) {
   if (docTitle) currentDocumentTitle = docTitle;
   document.getElementById('upload-hero').classList.add('hidden');
+  hideReaderLoading();
+
   const docContainer = document.getElementById('reader-document');
   docContainer.innerHTML = '';
   docContainer.classList.remove('hidden');
 
-  const totalPages = (currentLoadedPages && currentLoadedPages.length) || 1;
+  const totalPages = currentTotalPages || (currentLoadedPages && currentLoadedPages.length) || 1;
   if (currentReaderPageIndex > totalPages) currentReaderPageIndex = totalPages;
   if (currentReaderPageIndex < 1) currentReaderPageIndex = 1;
 
@@ -517,8 +636,8 @@ function displayExtractedPages(docTitle) {
   titleEl.textContent = currentDocumentTitle;
   docContainer.appendChild(titleEl);
 
-  // Render current active page only (prevents memory explosion on 50+ page PDFs)
-  const page = currentLoadedPages[currentReaderPageIndex - 1] || currentLoadedPages[0];
+  // Render current active page
+  const page = currentLoadedPages[currentReaderPageIndex - 1];
   if (page) {
     const pageEl = document.createElement('section');
     pageEl.className = 'reader-page';
@@ -559,17 +678,25 @@ function displayExtractedPages(docTitle) {
   applyAllReaderStyles();
 }
 
-function goToPreviousPage() {
+async function goToPreviousPage() {
   if (currentReaderPageIndex > 1) {
+    handleTtsStop();
     currentReaderPageIndex--;
+    showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
+    await extractPageData(currentReaderPageIndex);
+    hideReaderLoading();
     displayExtractedPages(currentDocumentTitle);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
-function goToNextPage() {
-  if (currentReaderPageIndex < currentLoadedPages.length) {
+async function goToNextPage() {
+  if (currentReaderPageIndex < currentTotalPages) {
+    handleTtsStop();
     currentReaderPageIndex++;
+    showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
+    await extractPageData(currentReaderPageIndex);
+    hideReaderLoading();
     displayExtractedPages(currentDocumentTitle);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -582,7 +709,9 @@ function reRenderActiveDocument() {
 }
 
 function loadSampleDocument() {
+  currentPdfDocument = null;
   currentReaderPageIndex = 1;
+  currentTotalPages = 1;
   currentLoadedPages = [
     {
       pageNumber: 1,
@@ -719,7 +848,10 @@ function handleTtsPlay() {
 
   if (!textToRead) {
     const pageEl = document.querySelector('.reader-document .reader-page');
-    textToRead = pageEl ? pageEl.innerText : '';
+    if (pageEl) {
+      const paragraphs = Array.from(pageEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(Boolean);
+      textToRead = paragraphs.join('\n\n') || pageEl.innerText;
+    }
   }
 
   if (!textToRead) return;

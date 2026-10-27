@@ -173,6 +173,12 @@
       </div>
     </section>
 
+        <!-- Loading State Overlay -->
+    <div id="reader-loading-overlay" class="reader-loading-overlay hidden" role="status" aria-live="polite">
+      <div class="reader-spinner"></div>
+      <p id="reader-loading-msg" class="reader-loading-msg">Loading and analyzing PDF document...</p>
+    </div>
+
     <!-- Active Reader Content Viewport -->
     <article id="reader-document" class="reader-document hidden">
       <!-- Generated pages and extracted text will be inserted here -->
@@ -217,6 +223,7 @@
 
   <!-- External & Local Scripts -->
   <script src="lib/pdf.min.js"></script>
+  <script src="lib/pdf.worker.min.js"></script>
   <script src="dictionary.js"></script>
   <script src="reader.js"></script>
 </body>
