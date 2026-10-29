@@ -26,124 +26,135 @@
     <!-- Typography & Sensory Accommodation Bar -->
     <div class="toolbar-scroll">
       <div class="accommodation-bar">
-        <!-- Font Selection -->
-        <div class="tool-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
-          <label for="reader-font">Typeface</label>
-          <select id="reader-font" class="tool-select">
-            <option value="OpenDyslexic">OpenDyslexic</option>
-            <option value="Lexend">Lexend</option>
-            <option value="'Atkinson Hyperlegible'">Atkinson Hyperlegible</option>
-            <option value="Verdana, Geneva, sans-serif">Verdana</option>
-            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-            <option value="'Comic Sans MS', cursive">Comic Sans</option>
-            <option value="system-ui, sans-serif">System Clean</option>
-          </select>
-        </div>
+        <!-- Group 1: Typography & Visual Appearance (Typeface -> Size -> Font Color -> Irlen Contrast) -->
+        <div class="tool-group">
+          <!-- Typeface -->
+          <div class="tool-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
+            <label for="reader-font">Typeface</label>
+            <select id="reader-font" class="tool-select">
+              <option value="OpenDyslexic">OpenDyslexic</option>
+              <option value="Lexend">Lexend</option>
+              <option value="'Atkinson Hyperlegible'">Atkinson Hyperlegible</option>
+              <option value="Verdana, Geneva, sans-serif">Verdana</option>
+              <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+              <option value="'Comic Sans MS', cursive">Comic Sans</option>
+              <option value="system-ui, sans-serif">System Clean</option>
+            </select>
+          </div>
 
-        <!-- Font Size Zoom -->
-        <div class="tool-item" data-tooltip-title="Font Size" data-tooltip-desc="Scale text size up or down for comfortable reading">
-          <label>Size</label>
-          <div class="btn-group">
-            <button id="font-decrease-btn" class="tool-btn" title="Decrease font size" aria-label="Decrease font size">A-</button>
-            <span id="font-size-val" class="tool-badge">18px</span>
-            <button id="font-increase-btn" class="tool-btn" title="Increase font size" aria-label="Increase font size">A+</button>
+          <!-- Font Size Zoom -->
+          <div class="tool-item" data-tooltip-title="Font Size" data-tooltip-desc="Scale text size up or down for comfortable reading">
+            <label>Size</label>
+            <div class="btn-group">
+              <button id="font-decrease-btn" class="tool-btn" aria-label="Decrease font size">A-</button>
+              <span id="font-size-val" class="tool-badge">18px</span>
+              <button id="font-increase-btn" class="tool-btn" aria-label="Increase font size">A+</button>
+            </div>
+          </div>
+
+          <!-- Font Color -->
+          <div class="tool-item" data-tooltip-title="Font Color" data-tooltip-desc="Choose high-contrast or softened text colors to ease eye strain">
+            <label for="reader-font-color">Font Color</label>
+            <select id="reader-font-color" class="tool-select">
+              <option value="default">Default</option>
+              <option value="#111111">Deep Black</option>
+              <option value="#2d2d2d">Soft Charcoal</option>
+              <option value="#0f1f38">Deep Navy</option>
+              <option value="#ffd796">Warm Amber</option>
+              <option value="#ffffff">Pure White</option>
+            </select>
+          </div>
+
+          <!-- Irlen Color Contrast Presets -->
+          <div class="tool-item" data-tooltip-title="Irlen Contrast" data-tooltip-desc="Apply soothing spectral background tints to eliminate glare and visual stress">
+            <label for="reader-contrast">Irlen Contrast</label>
+            <select id="reader-contrast" class="tool-select">
+              <option value="default">Default White</option>
+              <option value="cream">Soft Cream</option>
+              <option value="peach">Warm Peach</option>
+              <option value="mint">Calm Mint</option>
+              <option value="navy">Navy Night</option>
+              <option value="dark">Charcoal Dark</option>
+              <option value="inverted">Yellow on Black</option>
+            </select>
           </div>
         </div>
 
-        <!-- Tracking (Letter Space) -->
-        <div class="tool-item" data-tooltip-title="Letter Tracking" data-tooltip-desc="Expand letter spacing to prevent character crowding and blurring">
-          <div class="tool-label-row">
-            <label for="reader-tracking">Tracking</label>
-            <span id="reader-tracking-val" class="tool-badge">0px</span>
+        <!-- Group 2: Micro-Spacing (TRACKING -> WORD SPACE -> LEADING) -->
+        <div class="tool-group">
+          <!-- Tracking (Letter Space) -->
+          <div class="tool-item" data-tooltip-title="Letter Tracking" data-tooltip-desc="Expand letter spacing to prevent character crowding and blurring">
+            <div class="tool-label-row">
+              <label for="reader-tracking">Tracking</label>
+              <span id="reader-tracking-val" class="tool-badge">0px</span>
+            </div>
+            <input type="range" id="reader-tracking" min="0" max="6" step="0.25" value="0">
           </div>
-          <input type="range" id="reader-tracking" min="0" max="6" step="0.25" value="0">
-        </div>
 
-        <!-- Spacing (Word Space) -->
-        <div class="tool-item" data-tooltip-title="Word Spacing" data-tooltip-desc="Increase space between words to improve word boundary separation">
-          <div class="tool-label-row">
-            <label for="reader-spacing">Word Space</label>
-            <span id="reader-spacing-val" class="tool-badge">0px</span>
+          <!-- Spacing (Word Space) -->
+          <div class="tool-item" data-tooltip-title="Word Spacing" data-tooltip-desc="Increase space between words to improve word boundary separation">
+            <div class="tool-label-row">
+              <label for="reader-spacing">Word Space</label>
+              <span id="reader-spacing-val" class="tool-badge">0px</span>
+            </div>
+            <input type="range" id="reader-spacing" min="0" max="12" step="0.5" value="0">
           </div>
-          <input type="range" id="reader-spacing" min="0" max="12" step="0.5" value="0">
-        </div>
 
-        <!-- Leading (Line Height) -->
-        <div class="tool-item" data-tooltip-title="Line Height (Leading)" data-tooltip-desc="Add vertical space between lines to prevent line skipping and fatigue">
-          <div class="tool-label-row">
-            <label for="reader-leading">Leading</label>
-            <span id="reader-leading-val" class="tool-badge">1.6x</span>
-          </div>
-          <input type="range" id="reader-leading" min="1.1" max="2.6" step="0.1" value="1.6">
-        </div>
-
-        <!-- Font Color -->
-        <div class="tool-item" data-tooltip-title="Font Color" data-tooltip-desc="Choose high-contrast or softened text colors to ease eye strain">
-          <label for="reader-font-color">Font Color</label>
-          <select id="reader-font-color" class="tool-select">
-            <option value="default">Default</option>
-            <option value="#111111">Deep Black</option>
-            <option value="#2d2d2d">Soft Charcoal</option>
-            <option value="#0f1f38">Deep Navy</option>
-            <option value="#ffd796">Warm Amber</option>
-            <option value="#ffffff">Pure White</option>
-          </select>
-        </div>
-
-        <!-- Irlen Color Contrast Presets -->
-        <div class="tool-item" data-tooltip-title="Irlen Contrast" data-tooltip-desc="Apply soothing spectral background tints to eliminate glare and visual stress">
-          <label for="reader-contrast">Irlen Contrast</label>
-          <select id="reader-contrast" class="tool-select">
-            <option value="default">Default White</option>
-            <option value="cream">Soft Cream</option>
-            <option value="peach">Warm Peach</option>
-            <option value="mint">Calm Mint</option>
-            <option value="navy">Navy Night</option>
-            <option value="dark">Charcoal Dark</option>
-            <option value="inverted">Yellow on Black</option>
-          </select>
-        </div>
-
-        <!-- Toggles: Bionic & Ruler -->
-        <div class="tool-item tool-toggles">
-          <label class="checkbox-label" data-tooltip-title="Bionic Reading" data-tooltip-desc="Bolds initial word fixations to guide rapid saccadic eye movements">
-            <input type="checkbox" id="reader-bionic-toggle">
-            <span>Bionic Read</span>
-          </label>
-          <label class="checkbox-label" data-tooltip-title="Focus Ruler" data-tooltip-desc="Interactive reading guide bar following the mouse cursor">
-            <input type="checkbox" id="reader-ruler-toggle">
-            <span>Focus Ruler</span>
-          </label>
-        </div>
-
-        <!-- Text-to-Speech Player Controls -->
-        <div class="tool-item tts-player" data-tooltip-title="Read Aloud (TTS)" data-tooltip-desc="Listen to the current page or highlighted selection read aloud">
-          <label>Read Aloud</label>
-          <div class="btn-group">
-            <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud" aria-label="Play text-to-speech">Play</button>
-            <button id="reader-tts-stop" class="tool-btn icon-btn" title="Stop reading" aria-label="Stop text-to-speech">Stop</button>
+          <!-- Leading (Line Height) -->
+          <div class="tool-item" data-tooltip-title="Line Height (Leading)" data-tooltip-desc="Add vertical space between lines to prevent line skipping and fatigue">
+            <div class="tool-label-row">
+              <label for="reader-leading">Leading</label>
+              <span id="reader-leading-val" class="tool-badge">1.6x</span>
+            </div>
+            <input type="range" id="reader-leading" min="1.1" max="2.6" step="0.1" value="1.6">
           </div>
         </div>
 
-        <!-- Multi-Page Navigation Bar (Improvement 2) -->
-        <div class="tool-item page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
-          <label>Page</label>
-          <div class="btn-group">
-            <button id="reader-page-prev" class="tool-btn icon-btn" title="Previous page" aria-label="Go to previous page" disabled>&lsaquo;</button>
-            <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
-            <button id="reader-page-next" class="tool-btn icon-btn" title="Next page" aria-label="Go to next page">&rsaquo;</button>
+        <!-- Group 3: Reading Guides (BIONIC READ -> FOCUS RULER) -->
+        <div class="tool-group">
+          <!-- Toggles: Bionic & Ruler -->
+          <div class="tool-item tool-toggles">
+            <label class="checkbox-label" data-tooltip-title="Bionic Reading" data-tooltip-desc="Bolds initial word fixations to guide rapid saccadic eye movements">
+              <input type="checkbox" id="reader-bionic-toggle">
+              <span>Bionic Read</span>
+            </label>
+            <label class="checkbox-label" data-tooltip-title="Focus Ruler" data-tooltip-desc="Interactive reading guide bar following the mouse cursor">
+              <input type="checkbox" id="reader-ruler-toggle">
+              <span>Focus Ruler</span>
+            </label>
           </div>
         </div>
 
-        <!-- Simplified Dictionary Search -->
-        <div class="tool-item dict-search-box" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up words in simple, plain-language definitions with pronunciation">
-          <label for="dict-search-input">Simplified Dict</label>
-          <div class="input-with-btn">
-            <input type="text" id="dict-search-input" placeholder="Look up word...">
-            <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
+        <!-- Group 4: Audio & Reference Tools (READ ALOUD -> Page Nav -> Simplified Dict) -->
+        <div class="tool-group">
+          <!-- Text-to-Speech Player Controls -->
+          <div class="tool-item tts-player" data-tooltip-title="Read Aloud (TTS)" data-tooltip-desc="Listen to the current page or highlighted selection read aloud">
+            <label>Read Aloud</label>
+            <div class="btn-group">
+              <button id="reader-tts-play" class="tool-btn icon-btn" aria-label="Play text-to-speech">Play</button>
+              <button id="reader-tts-stop" class="tool-btn icon-btn" aria-label="Stop text-to-speech">Stop</button>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <!-- Multi-Page Navigation Bar -->
+          <div class="tool-item page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
+            <label>Page</label>
+            <div class="btn-group">
+              <button id="reader-page-prev" class="tool-btn icon-btn" aria-label="Go to previous page" disabled>&lsaquo;</button>
+              <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
+              <button id="reader-page-next" class="tool-btn icon-btn" aria-label="Go to next page">&rsaquo;</button>
+            </div>
+          </div>
+
+          <!-- Simplified Dictionary Search -->
+          <div class="tool-item dict-search-box" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up words in simple, plain-language definitions with pronunciation">
+            <label for="dict-search-input">Simplified Dict</label>
+            <div class="input-with-btn">
+              <input type="text" id="dict-search-input" placeholder="Look up word...">
+              <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
+            </div>
+          </div>
+        </div>      </div>
     </div>
   </header>
 

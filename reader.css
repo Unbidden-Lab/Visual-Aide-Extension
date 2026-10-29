@@ -189,6 +189,25 @@ body.va-reader-body {
   min-width: max-content;
 }
 
+/* Tool Group Container & Visual Dividers */
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 16px;
+  position: relative;
+}
+
+.tool-group:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 15%;
+  height: 70%;
+  width: 1px;
+  background: var(--reader-border, rgba(255, 255, 255, 0.12));
+}
+
 .tool-item {
   display: flex;
   flex-direction: column;
