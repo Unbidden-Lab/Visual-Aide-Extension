@@ -167,17 +167,17 @@ function setupStyleBlock() {
   let fontSizeRules = '';
   if (fontSizeScale !== 1) {
     fontSizeRules = `
-      /* Proportional non-compounding font scaling */
+      /* Proportional non-compounding font scaling across static pages and SPAs */
       html.va-active {
         font-size: calc(100% * var(--va-font-size-scale, 1)) !important;
       }
-      html.va-active :is(p, li, dt, dd, blockquote, figcaption):not([class*="badge"]):not([class*="chip"]):not([class*="icon"]):not(#va-action-badge *):not(#va-dict-modal *) {
+      html.va-active :is(p, li, dt, dd, blockquote, figcaption, [dir="auto"], article, [role="article"]):not([class*="badge"]):not([class*="chip"]):not([class*="icon"]):not(#va-action-badge *):not(#va-dict-modal *) {
         font-size: calc(1.05rem * var(--va-font-size-scale, 1)) !important;
       }
-      html.va-active h1 { font-size: calc(2.0rem * var(--va-font-size-scale, 1)) !important; }
-      html.va-active h2 { font-size: calc(1.6rem * var(--va-font-size-scale, 1)) !important; }
-      html.va-active h3 { font-size: calc(1.3rem * var(--va-font-size-scale, 1)) !important; }
-      html.va-active h4 { font-size: calc(1.15rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active :is(h1, [role="heading"][aria-level="1"]) { font-size: calc(2.0rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active :is(h2, [role="heading"][aria-level="2"]) { font-size: calc(1.6rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active :is(h3, [role="heading"][aria-level="3"]) { font-size: calc(1.3rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active :is(h4, [role="heading"][aria-level="4"]) { font-size: calc(1.15rem * var(--va-font-size-scale, 1)) !important; }
     `;
   }
 

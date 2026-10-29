@@ -149,8 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.fontSize = val;
       syncFontSizeUI(val);
       currentSettings.level = 0;
-      updateLevelButtons(0);
-      saveSettings();
+      levelBtns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      });
+      saveAndApply(currentSettings);
     });
   }
 
@@ -160,8 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.fontSize = val;
       syncFontSizeUI(val);
       currentSettings.level = 0;
-      updateLevelButtons(0);
-      saveSettings();
+      levelBtns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      });
+      saveAndApply(currentSettings);
     });
   }
 
