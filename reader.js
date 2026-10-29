@@ -80,8 +80,16 @@ let readerLastMouseY = 0;
 let readerTtsQueue = [];
 let readerTtsIndex = 0;
 let readerTtsTimer = null;
+let readerChunkStartTime = 0;
+const activeReaderUtterances = new Set();
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+    window.speechSynthesis.getVoices();
+  }
   initNetworkStatus();
   initSettingsSync();
   initToolbarControls();
@@ -793,35 +801,74 @@ function handleReaderMouseMove(e) {
 // -------------------------------------------------------------
 // Text to Speech (TTS)
 // -------------------------------------------------------------
+function updateReaderTtsUi(isPlaying) {
+  const playBtn = document.getElementById('reader-tts-play');
+  if (!playBtn) return;
+  if (isPlaying) {
+    playBtn.textContent = 'Pause';
+    playBtn.setAttribute('aria-label', 'Pause reading aloud');
+    playBtn.classList.add('active');
+  } else {
+    playBtn.textContent = 'Play';
+    playBtn.setAttribute('aria-label', 'Read page aloud');
+    playBtn.classList.remove('active');
+  }
+}
+
 function chunkReaderTtsText(text) {
   if (!text) return [];
-  const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+
+  // Normalize Unicode ligatures and clean non-printable control characters
+  const clean = text
+    .replace(/\uFB00/g, 'ff')
+    .replace(/\uFB01/g, 'fi')
+    .replace(/\uFB02/g, 'fl')
+    .replace(/\uFB03/g, 'ffi')
+    .replace(/\uFB04/g, 'ffl')
+    .replace(/\(cid:\d+\)/g, ' ')
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, ' ')
+    .replace(/[-_.~*]{3,}/g, ' ')
+    .trim();
+
+  if (!clean) return [];
+
+  const sentences = clean.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [clean];
   const chunks = [];
   let current = '';
+
   for (let i = 0; i < sentences.length; i++) {
-    const s = sentences[i].trim();
-    if (!s) continue;
+    const s = sentences[i].replace(/\s+/g, ' ').trim();
+    if (!s || !/[a-zA-Z0-9]/.test(s)) continue;
+
     if ((current + ' ' + s).length > 180 && current) {
-      chunks.push(current.trim());
+      if (/[a-zA-Z0-9]/.test(current)) chunks.push(current.trim());
       current = s;
     } else {
       current += (current ? ' ' : '') + s;
     }
   }
-  if (current.trim()) chunks.push(current.trim());
+
+  if (current.trim() && /[a-zA-Z0-9]/.test(current)) {
+    chunks.push(current.trim());
+  }
+
   return chunks;
 }
 
 function startReaderTtsHeartbeat() {
   stopReaderTtsHeartbeat();
   readerTtsTimer = setInterval(() => {
-    if (window.speechSynthesis && window.speechSynthesis.speaking) {
-      window.speechSynthesis.pause();
-      window.speechSynthesis.resume();
-    } else {
+    if (window.speechSynthesis && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+      // Chrome watchdog: only kick stalled chunks that exceed 12 seconds continuously
+      if (readerChunkStartTime && Date.now() - readerChunkStartTime > 12000) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+        readerChunkStartTime = Date.now();
+      }
+    } else if (!window.speechSynthesis || (!window.speechSynthesis.speaking && !window.speechSynthesis.paused)) {
       stopReaderTtsHeartbeat();
     }
-  }, 10000);
+  }, 3000);
 }
 
 function stopReaderTtsHeartbeat() {
@@ -838,33 +885,71 @@ function playNextReaderTtsChunk() {
   }
 
   const chunk = readerTtsQueue[readerTtsIndex];
+  if (!chunk || !/[a-zA-Z0-9]/.test(chunk)) {
+    readerTtsIndex++;
+    playNextReaderTtsChunk();
+    return;
+  }
+
   ttsUtterance = new SpeechSynthesisUtterance(chunk);
   ttsUtterance.rate = 0.95;
+  ttsUtterance.lang = navigator.language || 'en-US';
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices && voices.length > 0) {
+    const preferred = voices.find(v => v.lang.startsWith(navigator.language.slice(0, 2)) && !v.localService) ||
+                      voices.find(v => v.lang.startsWith('en')) ||
+                      voices[0];
+    if (preferred) ttsUtterance.voice = preferred;
+  }
+
+  // Prevent Chromium garbage-collection bug while utterance is speaking
+  activeReaderUtterances.add(ttsUtterance);
+  readerChunkStartTime = Date.now();
 
   ttsUtterance.onend = () => {
+    activeReaderUtterances.delete(ttsUtterance);
     readerTtsIndex++;
     playNextReaderTtsChunk();
   };
 
   ttsUtterance.onerror = (err) => {
-    console.warn('Reader TTS error:', err);
-    handleTtsStop();
+    activeReaderUtterances.delete(ttsUtterance);
+
+    // Canceled or interrupted events are normal lifecycle results of user actions (Stop, Prev/Next page)
+    if (err.error === 'canceled' || err.error === 'interrupted') {
+      return;
+    }
+
+    console.warn('Reader TTS chunk skipped due to synthesis issue:', err.error || err);
+    // Move to next chunk rather than terminating entire playback
+    readerTtsIndex++;
+    playNextReaderTtsChunk();
   };
 
+  updateReaderTtsUi(true);
   window.speechSynthesis.speak(ttsUtterance);
 }
 
 function handleTtsPlay() {
   if (!window.speechSynthesis) return;
 
-  if (window.speechSynthesis.speaking && readerTtsQueue.length > 0) {
+  // If currently paused, resume playback
+  if (window.speechSynthesis.paused && readerTtsQueue.length > 0) {
     window.speechSynthesis.resume();
+    updateReaderTtsUi(true);
     return;
   }
 
+  // If already speaking and user clicks play without a new selection, toggle pause
   const selection = window.getSelection().toString().trim();
-  let textToRead = selection;
+  if (window.speechSynthesis.speaking && readerTtsQueue.length > 0 && !selection) {
+    window.speechSynthesis.pause();
+    updateReaderTtsUi(false);
+    return;
+  }
 
+  let textToRead = selection;
   if (!textToRead) {
     const pageEl = document.querySelector('.reader-document .reader-page');
     if (pageEl) {
@@ -878,19 +963,27 @@ function handleTtsPlay() {
   const chunks = chunkReaderTtsText(textToRead);
   if (chunks.length === 0) return;
 
+  // Reset any active speech cleanly and wait for Chrome IPC to clear before speaking
+  window.speechSynthesis.cancel();
+  activeReaderUtterances.clear();
   readerTtsQueue = chunks;
   readerTtsIndex = 0;
-  startReaderTtsHeartbeat();
-  playNextReaderTtsChunk();
+
+  setTimeout(() => {
+    startReaderTtsHeartbeat();
+    playNextReaderTtsChunk();
+  }, 50);
 }
 
 function handleTtsStop() {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
+  activeReaderUtterances.clear();
   stopReaderTtsHeartbeat();
   readerTtsQueue = [];
   readerTtsIndex = 0;
+  updateReaderTtsUi(false);
 }
 
 // -------------------------------------------------------------
@@ -992,9 +1085,29 @@ async function openDictionaryModal(word) {
     ttsBtn.onclick = () => {
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(entry.word);
-        u.rate = 0.85;
-        window.speechSynthesis.speak(u);
+        activeReaderUtterances.clear();
+        updateReaderTtsUi(false);
+        setTimeout(() => {
+          const u = new SpeechSynthesisUtterance(entry.word);
+          u.rate = 0.85;
+          u.lang = navigator.language || 'en-US';
+          const voices = window.speechSynthesis.getVoices();
+          if (voices && voices.length > 0) {
+            const preferred = voices.find(v => v.lang.startsWith(navigator.language.slice(0, 2)) && !v.localService) ||
+                              voices.find(v => v.lang.startsWith('en')) ||
+                              voices[0];
+            if (preferred) u.voice = preferred;
+          }
+          activeReaderUtterances.add(u);
+          u.onend = () => activeReaderUtterances.delete(u);
+          u.onerror = (e) => {
+            activeReaderUtterances.delete(u);
+            if (e.error !== 'canceled' && e.error !== 'interrupted') {
+              console.warn('Dictionary TTS error:', e.error || e);
+            }
+          };
+          window.speechSynthesis.speak(u);
+        }, 50);
       }
     };
   } else {

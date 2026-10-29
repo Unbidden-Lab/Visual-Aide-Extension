@@ -1121,8 +1121,15 @@ function playNextTtsChunk() {
   }
 
   const chunk = ttsQueue[ttsActiveIndex];
+  if (!chunk || !/[a-zA-Z0-9]/.test(chunk)) {
+    ttsActiveIndex++;
+    playNextTtsChunk();
+    return;
+  }
+
   currentUtterance = new SpeechSynthesisUtterance(chunk);
   currentUtterance.rate = 0.95;
+  currentUtterance.lang = navigator.language || 'en-US';
 
   currentUtterance.onend = () => {
     ttsActiveIndex++;
@@ -1130,8 +1137,12 @@ function playNextTtsChunk() {
   };
 
   currentUtterance.onerror = (err) => {
-    console.warn('TTS chunk error:', err);
-    stopTtsPlayback();
+    if (err.error === 'canceled' || err.error === 'interrupted') {
+      return;
+    }
+    console.warn('TTS chunk skipped:', err.error || err);
+    ttsActiveIndex++;
+    playNextTtsChunk();
   };
 
   window.speechSynthesis.speak(currentUtterance);
