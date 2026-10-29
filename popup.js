@@ -121,6 +121,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function updateLevelButtons(activeLevel = 0) {
+    levelBtns.forEach((btn) => {
+      const isActive = parseInt(btn.dataset.level, 10) === activeLevel;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  function saveSettings() {
+    saveAndApply(currentSettings);
+  }
+
   function syncFontSizeUI(size) {
     const val = parseInt(size, 10) || 100;
     if (fontSizeSlider) fontSizeSlider.value = val;
@@ -149,10 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.fontSize = val;
       syncFontSizeUI(val);
       currentSettings.level = 0;
-      levelBtns.forEach(btn => {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-pressed', 'false');
-      });
+      updateLevelButtons(0);
       saveAndApply(currentSettings);
     });
   }
@@ -163,10 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.fontSize = val;
       syncFontSizeUI(val);
       currentSettings.level = 0;
-      levelBtns.forEach(btn => {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-pressed', 'false');
-      });
+      updateLevelButtons(0);
       saveAndApply(currentSettings);
     });
   }
@@ -218,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       saveAndApply(currentSettings);
       updateBadges(currentSettings);
-      levelBtns.forEach(btn => btn.classList.remove('active'));
+      updateLevelButtons(0);
     });
   });
 
@@ -226,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
   leftAlignToggle.addEventListener('change', (e) => {
     currentSettings.forceLeftAlign = e.target.checked;
     currentSettings.level = 0;
-    levelBtns.forEach(btn => btn.classList.remove('active'));
+    updateLevelButtons(0);
     saveAndApply(currentSettings);
   });
 
@@ -246,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overlaySlider.value = 0.2;
       }
       currentSettings.level = 0;
-      levelBtns.forEach(btn => btn.classList.remove('active'));
+      updateLevelButtons(0);
       tintChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       saveAndApply(currentSettings);
@@ -301,11 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateUI(settings) {
-    levelBtns.forEach(btn => {
-      const isActive = parseInt(btn.dataset.level, 10) === settings.level;
-      btn.classList.toggle('active', isActive);
-      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
+    updateLevelButtons(settings.level || 0);
 
     fontSelect.value = settings.font || 'OpenDyslexic';
     syncFontSizeUI(settings.fontSize || 100);
