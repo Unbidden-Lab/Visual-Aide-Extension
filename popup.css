@@ -322,26 +322,92 @@ input[type=range] {
   font-weight: 500;
 }
 .switch-desc {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
+  font-size: 0.66rem;
+  color: #727272;
+  line-height: 1.2;
 }
 
 .section-desc {
   display: block;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
+  font-size: 0.68rem;
+  color: #757575;
   margin-top: -4px;
   margin-bottom: 8px;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .control-desc {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  color: #707070;
+  margin-top: 3px;
+  margin-bottom: 2px;
+  line-height: 1.2;
+  letter-spacing: 0.1px;
+}
+
+/* Collapsible Advanced Typography Spacing Accordion */
+.advanced-accordion {
+  margin: 10px 0 8px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.advanced-accordion[open] {
+  border-color: rgba(0, 255, 204, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.advanced-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
   color: var(--text-secondary);
-  margin-top: 2px;
-  margin-bottom: 6px;
-  line-height: 1.25;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.advanced-summary-chevron {
+  width: 5px;
+  height: 5px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  margin-right: 2px;
+}
+
+.advanced-accordion[open] .advanced-summary-chevron {
+  transform: rotate(45deg);
+  border-color: var(--accent-color);
+}
+
+.advanced-accordion[open] .advanced-summary {
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.advanced-content {
+  padding: 10px 10px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .divider {

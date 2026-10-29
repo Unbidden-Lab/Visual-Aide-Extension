@@ -76,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const fontColorSelect = document.getElementById('font-color');
   const contrastModeSelect = document.getElementById('contrast-mode');
   const fontSizeSlider = document.getElementById('font-size');
-  const fontSizeSelect = document.getElementById('font-size-select');
   const fontSizeVal = document.getElementById('font-size-val');
   const trackingSlider = document.getElementById('tracking');
   const spacingSlider = document.getElementById('spacing');
@@ -137,37 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const val = parseInt(size, 10) || 100;
     if (fontSizeSlider) fontSizeSlider.value = val;
     if (fontSizeVal) fontSizeVal.textContent = `${val}%`;
-    if (fontSizeSelect) {
-      const match = Array.from(fontSizeSelect.options).find(opt => parseInt(opt.value, 10) === val);
-      if (match) {
-        fontSizeSelect.value = String(val);
-      } else {
-        let customOpt = fontSizeSelect.querySelector('option[data-custom="true"]');
-        if (!customOpt) {
-          customOpt = document.createElement('option');
-          customOpt.dataset.custom = "true";
-          fontSizeSelect.appendChild(customOpt);
-        }
-        customOpt.value = String(val);
-        customOpt.textContent = `${val}% (Custom)`;
-        fontSizeSelect.value = String(val);
-      }
-    }
   }
 
   if (fontSizeSlider) {
     fontSizeSlider.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      currentSettings.fontSize = val;
-      syncFontSizeUI(val);
-      currentSettings.level = 0;
-      updateLevelButtons(0);
-      saveAndApply(currentSettings);
-    });
-  }
-
-  if (fontSizeSelect) {
-    fontSizeSelect.addEventListener('change', (e) => {
       const val = parseInt(e.target.value, 10);
       currentSettings.fontSize = val;
       syncFontSizeUI(val);
