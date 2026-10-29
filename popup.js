@@ -21,7 +21,9 @@ const DEFAULT_SETTINGS = {
   tts: true,
   dictionary: true,
   ttsVoice: 'female',
-  ttsVoiceGender: 'female'
+  ttsVoiceGender: 'female',
+  ttsSpeed: 1.0,
+  ttsRate: 1.0
 };
 
 // -------------------------------------------------------------
@@ -133,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const openReaderBtn = document.getElementById('open-reader-btn');
   const ttsVoiceSelect = document.getElementById('tts-voice');
   const ttsVoiceTestBtn = document.getElementById('tts-voice-test-btn');
+  const ttsSpeedSelect = document.getElementById('tts-speed');
 
   const levelBtns = document.querySelectorAll('.level-btn');
   const fontSelect = document.getElementById('font-family');
@@ -172,14 +175,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     currentSettings = { ...DEFAULT_SETTINGS, ...raw, tts: true, dictionary: true };
 
-    // Load persisted voice from sync storage
+    // Load persisted voice and speed multiplier from sync storage
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
         const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
         if (syncVoice) {
           currentSettings.ttsVoice = syncVoice;
           currentSettings.ttsVoiceGender = syncVoice;
           if (ttsVoiceSelect) ttsVoiceSelect.value = syncVoice;
+        }
+        const syncSpeed = syncRes?.ttsSpeed ?? syncRes?.ttsRate;
+        if (syncSpeed !== undefined && syncSpeed !== null) {
+          const s = parseFloat(syncSpeed);
+          currentSettings.ttsSpeed = s;
+          currentSettings.ttsRate = s;
+          if (ttsSpeedSelect) ttsSpeedSelect.value = s.toString();
         }
       });
     }
@@ -225,6 +235,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // TTS Speed Multiplier & Sync Storage
+  if (ttsSpeedSelect) {
+    ttsSpeedSelect.addEventListener('change', (e) => {
+      const chosen = parseFloat(e.target.value) || 1.0;
+      currentSettings.ttsSpeed = chosen;
+      currentSettings.ttsRate = chosen;
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.set({ ttsSpeed: chosen, ttsRate: chosen }, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+          }
+        });
+      }
+      saveAndApply(currentSettings);
+    });
+  }
+
   // Master switch
   masterToggle.addEventListener('change', (e) => {
     currentSettings.isActive = e.target.checked;
@@ -236,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resetBtn.addEventListener('click', () => {
     currentSettings = { ...DEFAULT_SETTINGS, isActive: masterToggle.checked };
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.set({ ttsVoice: 'female', ttsVoiceGender: 'female' });
+      chrome.storage.sync.set({ ttsVoice: 'female', ttsVoiceGender: 'female', ttsSpeed: 1.0, ttsRate: 1.0 });
     }
     saveAndApply(currentSettings);
     updateUI(currentSettings);
@@ -365,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const gender = ttsVoiceSelect ? ttsVoiceSelect.value : (currentSettings.ttsVoice || 'female');
       const text = gender === 'male' ? 'Hello, this is Guy reading aloud with Visual Aide.' : 'Hello, this is Aria reading aloud with Visual Aide.';
       const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 0.95;
+      utter.rate = parseFloat(currentSettings.ttsSpeed || 1.0);
       const voices = window.speechSynthesis.getVoices();
       const preferred = getResolvedVoice(voices, gender);
       if (preferred) {
@@ -434,6 +461,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ttsVoiceSelect) {
       ttsVoiceSelect.value = settings.ttsVoice || settings.ttsVoiceGender || 'female';
     }
+    if (ttsSpeedSelect) {
+      ttsSpeedSelect.value = (settings.ttsSpeed || settings.ttsRate || 1.0).toString();
+    }
 
     updateBadges(settings);
   }
@@ -447,20 +477,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
-    // Persist voice selection to sync storage
-    if (toSave.ttsVoice && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.set({ ttsVoice: toSave.ttsVoice, ttsVoiceGender: toSave.ttsVoice });
+    // Persist voice and speed selection to sync storage
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      const syncObj = {};
+      if (toSave.ttsVoice) {
+        syncObj.ttsVoice = toSave.ttsVoice;
+        syncObj.ttsVoiceGender = toSave.ttsVoice;
+      }
+      if (toSave.ttsSpeed !== undefined) {
+        syncObj.ttsSpeed = toSave.ttsSpeed;
+        syncObj.ttsRate = toSave.ttsSpeed;
+      }
+      chrome.storage.sync.set(syncObj);
     }
   }
 
   // Real-time synchronization when settings change from shortcuts or other tabs (Improvement 7)
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
-      const v = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
-      if (v) {
-        currentSettings.ttsVoice = v;
-        currentSettings.ttsVoiceGender = v;
-        if (ttsVoiceSelect) ttsVoiceSelect.value = v;
+    if (area === 'sync') {
+      if (changes.ttsVoice || changes.ttsVoiceGender) {
+        const v = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+        if (v) {
+          currentSettings.ttsVoice = v;
+          currentSettings.ttsVoiceGender = v;
+          if (ttsVoiceSelect) ttsVoiceSelect.value = v;
+        }
+      }
+      if (changes.ttsSpeed || changes.ttsRate) {
+        const s = parseFloat(changes.ttsSpeed?.newValue ?? changes.ttsRate?.newValue ?? 1.0);
+        currentSettings.ttsSpeed = s;
+        currentSettings.ttsRate = s;
+        if (ttsSpeedSelect) ttsSpeedSelect.value = s.toString();
       }
     }
     if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {

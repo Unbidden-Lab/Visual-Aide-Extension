@@ -22,7 +22,9 @@ const DEFAULT_SETTINGS = {
   tts: true,
   dictionary: true,
   ttsVoice: 'female',
-  ttsVoiceGender: 'female'
+  ttsVoiceGender: 'female',
+  ttsSpeed: 1.0,
+  ttsRate: 1.0
 };
 
 chrome.runtime.onInstalled.addListener(() => {

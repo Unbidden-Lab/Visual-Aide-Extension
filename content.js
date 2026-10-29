@@ -72,7 +72,9 @@ let currentSettings = {
   tts: true,
   dictionary: true,
   ttsVoice: 'female',
-  ttsVoiceGender: 'female'
+  ttsVoiceGender: 'female',
+  ttsSpeed: 1.0,
+  ttsRate: 1.0
 };
 
 // -------------------------------------------------------------
@@ -1183,7 +1185,7 @@ function playNextTtsChunk() {
   }
 
   currentUtterance = new SpeechSynthesisUtterance(chunk);
-  currentUtterance.rate = 0.95;
+  currentUtterance.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
   currentUtterance.lang = navigator.language || 'en-US';
 
   if (window.speechSynthesis) {
@@ -1400,11 +1402,16 @@ function applyAll(settings) {
 
 function boot() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
       const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
       if (syncVoice) {
         currentSettings.ttsVoice = syncVoice;
         currentSettings.ttsVoiceGender = syncVoice;
+      }
+      const syncSpeed = syncRes?.ttsSpeed ?? syncRes?.ttsRate;
+      if (syncSpeed !== undefined && syncSpeed !== null) {
+        currentSettings.ttsSpeed = parseFloat(syncSpeed);
+        currentSettings.ttsRate = parseFloat(syncSpeed);
       }
     });
   }
@@ -1425,11 +1432,20 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
-    const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
-    if (syncVoice) {
-      currentSettings.ttsVoice = syncVoice;
-      currentSettings.ttsVoiceGender = syncVoice;
+  if (area === 'sync') {
+    if (changes.ttsVoice || changes.ttsVoiceGender) {
+      const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+      if (syncVoice) {
+        currentSettings.ttsVoice = syncVoice;
+        currentSettings.ttsVoiceGender = syncVoice;
+      }
+    }
+    if (changes.ttsSpeed || changes.ttsRate) {
+      const syncSpeed = changes.ttsSpeed?.newValue ?? changes.ttsRate?.newValue;
+      if (syncSpeed !== undefined && syncSpeed !== null) {
+        currentSettings.ttsSpeed = parseFloat(syncSpeed);
+        currentSettings.ttsRate = parseFloat(syncSpeed);
+      }
     }
   }
   if (area === 'local' && changes.va_settings?.newValue) {

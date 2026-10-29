@@ -50,7 +50,8 @@ let currentReaderSettings = {
   contrast: 'default',
   bionic: false,
   ruler: false,
-  ttsVoice: 'female'
+  ttsVoice: 'female',
+  ttsSpeed: 1.0
 };
 
 // -------------------------------------------------------------
@@ -181,14 +182,20 @@ function initNetworkStatus() {
 // Settings Initialization & Sync with Extension
 // -------------------------------------------------------------
 function initSettingsSync() {
-  // Query sync storage for voice selection
+  // Query sync storage for voice and speed selection
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
       const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
       if (syncVoice) {
         currentReaderSettings.ttsVoice = syncVoice;
         const voiceSelect = document.getElementById('reader-tts-voice');
         if (voiceSelect) voiceSelect.value = syncVoice;
+      }
+      const syncSpeed = syncRes?.ttsSpeed ?? syncRes?.ttsRate;
+      if (syncSpeed !== undefined && syncSpeed !== null) {
+        currentReaderSettings.ttsSpeed = parseFloat(syncSpeed);
+        const speedSelect = document.getElementById('reader-tts-speed');
+        if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
       }
     });
   }
@@ -206,6 +213,7 @@ function initSettingsSync() {
         if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
         if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
         if (s.ttsVoice && !currentReaderSettings.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
+        if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
         applyAllReaderStyles();
         updateToolbarUI();
       }
@@ -213,12 +221,22 @@ function initSettingsSync() {
 
     if (chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
-          const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
-          if (syncVoice) {
-            currentReaderSettings.ttsVoice = syncVoice;
-            const voiceSelect = document.getElementById('reader-tts-voice');
-            if (voiceSelect) voiceSelect.value = syncVoice;
+        if (area === 'sync') {
+          if (changes.ttsVoice || changes.ttsVoiceGender) {
+            const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+            if (syncVoice) {
+              currentReaderSettings.ttsVoice = syncVoice;
+              const voiceSelect = document.getElementById('reader-tts-voice');
+              if (voiceSelect) voiceSelect.value = syncVoice;
+            }
+          }
+          if (changes.ttsSpeed || changes.ttsRate) {
+            const syncSpeed = changes.ttsSpeed?.newValue ?? changes.ttsRate?.newValue;
+            if (syncSpeed !== undefined && syncSpeed !== null) {
+              currentReaderSettings.ttsSpeed = parseFloat(syncSpeed);
+              const speedSelect = document.getElementById('reader-tts-speed');
+              if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
+            }
           }
         }
         if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
@@ -245,11 +263,13 @@ function initSettingsSync() {
 
 function saveReaderSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    // Save voice to sync storage
+    // Save voice and speed to sync storage
     if (chrome.storage.sync) {
       chrome.storage.sync.set({
         ttsVoice: currentReaderSettings.ttsVoice || 'female',
-        ttsVoiceGender: currentReaderSettings.ttsVoice || 'female'
+        ttsVoiceGender: currentReaderSettings.ttsVoice || 'female',
+        ttsSpeed: currentReaderSettings.ttsSpeed || 1.0,
+        ttsRate: currentReaderSettings.ttsSpeed || 1.0
       }, () => {
         if (chrome.runtime && chrome.runtime.lastError) {
           console.warn('Sync storage warning:', chrome.runtime.lastError.message);
@@ -270,6 +290,8 @@ function saveReaderSettings() {
         existing.ruler = currentReaderSettings.ruler;
         existing.ttsVoice = currentReaderSettings.ttsVoice || 'female';
         existing.ttsVoiceGender = currentReaderSettings.ttsVoice || 'female';
+        existing.ttsSpeed = currentReaderSettings.ttsSpeed || 1.0;
+        existing.ttsRate = currentReaderSettings.ttsSpeed || 1.0;
         chrome.storage.local.set({ va_settings: existing });
       });
     }
@@ -397,6 +419,15 @@ function initToolbarControls() {
     });
   }
 
+  // TTS Speed selector
+  const speedSelect = document.getElementById('reader-tts-speed');
+  if (speedSelect) {
+    speedSelect.addEventListener('change', (e) => {
+      currentReaderSettings.ttsSpeed = parseFloat(e.target.value) || 1.0;
+      saveReaderSettings();
+    });
+  }
+
   // Multi-page navigation (Improvement 2)
   const prevBtn = document.getElementById('reader-page-prev');
   if (prevBtn) prevBtn.addEventListener('click', goToPreviousPage);
@@ -456,6 +487,9 @@ function updateToolbarUI() {
 
   const voiceEl = document.getElementById('reader-tts-voice');
   if (voiceEl) voiceEl.value = currentReaderSettings.ttsVoice || 'female';
+
+  const speedEl = document.getElementById('reader-tts-speed');
+  if (speedEl) speedEl.value = (currentReaderSettings.ttsSpeed || 1.0).toString();
 }
 
 function applyAllReaderStyles() {
@@ -997,7 +1031,7 @@ function playNextReaderTtsChunk() {
   }
 
   ttsUtterance = new SpeechSynthesisUtterance(chunk);
-  ttsUtterance.rate = 0.95;
+  ttsUtterance.rate = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
   ttsUtterance.lang = navigator.language || 'en-US';
 
   const voices = window.speechSynthesis.getVoices();
@@ -1193,7 +1227,7 @@ async function openDictionaryModal(word) {
         updateReaderTtsUi(false);
         setTimeout(() => {
           const u = new SpeechSynthesisUtterance(entry.word);
-          u.rate = 0.85;
+          u.rate = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
           u.lang = navigator.language || 'en-US';
           const voices = window.speechSynthesis.getVoices();
           const preferredVoice = getResolvedVoice(voices, currentReaderSettings.ttsVoice || 'female');
