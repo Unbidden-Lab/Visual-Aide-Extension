@@ -19,8 +19,63 @@ const DEFAULT_SETTINGS = {
   rulerHeight: 40,
   bionic: false,
   tts: true,
-  dictionary: true
+  dictionary: true,
+  ttsVoice: 'female',
+  ttsVoiceGender: 'female'
 };
+
+// -------------------------------------------------------------
+// Natural Neural Voice Matcher (Aria for Female, Guy for Male)
+// -------------------------------------------------------------
+function getResolvedVoice(voices, gender = 'female') {
+  if (!voices || voices.length === 0) return null;
+  const isFemale = (gender || 'female').toLowerCase() === 'female';
+
+  const femalePriority = [
+    // 1. Aria neural natural (Edge / Windows / Azure)
+    v => /\baria\b/i.test(v.name),
+    // 2. Jenny or other natural female voices
+    v => /\b(jenny|michelle|ana|sonia|libby)\b/i.test(v.name),
+    // 3. Online/Natural female
+    v => /(natural|online)/i.test(v.name) && /(female|woman)/i.test(v.name),
+    // 4. Known female system voices
+    v => /(zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa)/i.test(v.name),
+    // 5. Explicit female label
+    v => /female/i.test(v.name),
+    // 6. English voice that is not explicitly male
+    v => v.lang.startsWith('en') && !/(guy|david|mark|george|christopher|alex|daniel|fred|richard|james|eric|roger|ryan|steffan|oliver|ravi|\bmale\b|\bman\b)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const malePriority = [
+    // 1. Guy neural natural (Edge / Windows / Azure)
+    v => /\bguy\b/i.test(v.name),
+    // 2. Christopher, Eric, Roger or other natural male voices
+    v => /\b(christopher|eric|roger|ryan|steffan)\b/i.test(v.name),
+    // 3. Online/Natural male
+    v => /(natural|online)/i.test(v.name) && /(?<!fe)male|\bman\b/i.test(v.name),
+    // 4. Known male system voices
+    v => /(david|mark|george|alex|daniel|fred|richard|james|oliver|ravi)/i.test(v.name),
+    // 5. Explicit male label (not female)
+    v => /(?<!fe)male|\bman\b/i.test(v.name),
+    // 6. English voice that is not explicitly female
+    v => v.lang.startsWith('en') && !/(aria|jenny|michelle|ana|sonia|libby|zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa|female|woman)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const matchers = isFemale ? femalePriority : malePriority;
+  for (const matcher of matchers) {
+    const found = voices.find(matcher);
+    if (found) return found;
+  }
+  return voices[0];
+}
 
 const PRESETS = {
   1: {
@@ -65,11 +120,19 @@ const PRESETS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+    window.speechSynthesis.getVoices();
+  }
   const masterToggle = document.getElementById('master-toggle');
   const statusText = document.getElementById('status-text');
   const controlsContainer = document.getElementById('controls-container');
   const resetBtn = document.getElementById('reset-btn');
   const openReaderBtn = document.getElementById('open-reader-btn');
+  const ttsVoiceSelect = document.getElementById('tts-voice');
+  const ttsVoiceTestBtn = document.getElementById('tts-voice-test-btn');
 
   const levelBtns = document.querySelectorAll('.level-btn');
   const fontSelect = document.getElementById('font-family');
@@ -108,6 +171,19 @@ document.addEventListener('DOMContentLoaded', () => {
       raw.spacing = raw.kerning * 2.5;
     }
     currentSettings = { ...DEFAULT_SETTINGS, ...raw, tts: true, dictionary: true };
+
+    // Load persisted voice from sync storage
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+        const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
+        if (syncVoice) {
+          currentSettings.ttsVoice = syncVoice;
+          currentSettings.ttsVoiceGender = syncVoice;
+          if (ttsVoiceSelect) ttsVoiceSelect.value = syncVoice;
+        }
+      });
+    }
+
     masterToggle.checked = currentSettings.isActive !== false;
     updateToggleUI(masterToggle.checked);
     updateUI(currentSettings);
@@ -159,6 +235,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Reset to default settings
   resetBtn.addEventListener('click', () => {
     currentSettings = { ...DEFAULT_SETTINGS, isActive: masterToggle.checked };
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      chrome.storage.sync.set({ ttsVoice: 'female', ttsVoiceGender: 'female' });
+    }
     saveAndApply(currentSettings);
     updateUI(currentSettings);
   });
@@ -257,6 +336,53 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAndApply(currentSettings);
   });
 
+  // TTS Voice Selector & Sync Storage
+  if (ttsVoiceSelect) {
+    ttsVoiceSelect.addEventListener('change', (e) => {
+      const chosen = e.target.value === 'male' ? 'male' : 'female';
+      currentSettings.ttsVoice = chosen;
+      currentSettings.ttsVoiceGender = chosen;
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.set({ ttsVoice: chosen, ttsVoiceGender: chosen }, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+          }
+        });
+      }
+      saveAndApply(currentSettings);
+    });
+  }
+
+  // TTS Voice Preview Test Button
+  if (ttsVoiceTestBtn) {
+    ttsVoiceTestBtn.addEventListener('click', () => {
+      if (!window.speechSynthesis) return;
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        ttsVoiceTestBtn.textContent = 'Test Voice';
+        return;
+      }
+      const gender = ttsVoiceSelect ? ttsVoiceSelect.value : (currentSettings.ttsVoice || 'female');
+      const text = gender === 'male' ? 'Hello, this is Guy reading aloud with Visual Aide.' : 'Hello, this is Aria reading aloud with Visual Aide.';
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.95;
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = getResolvedVoice(voices, gender);
+      if (preferred) {
+        utter.voice = preferred;
+        if (preferred.lang) utter.lang = preferred.lang;
+      }
+      ttsVoiceTestBtn.textContent = 'Stop';
+      utter.onend = () => {
+        ttsVoiceTestBtn.textContent = 'Test Voice';
+      };
+      utter.onerror = () => {
+        ttsVoiceTestBtn.textContent = 'Test Voice';
+      };
+      window.speechSynthesis.speak(utter);
+    });
+  }
+
   function updateToggleUI(isActive) {
     if (isActive) {
       statusText.textContent = 'System active.';
@@ -305,6 +431,9 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.setAttribute('aria-checked', isModeActive ? 'true' : 'false');
     });
     rulerHeightSlider.value = settings.rulerHeight || 40;
+    if (ttsVoiceSelect) {
+      ttsVoiceSelect.value = settings.ttsVoice || settings.ttsVoiceGender || 'female';
+    }
 
     updateBadges(settings);
   }
@@ -318,10 +447,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+    // Persist voice selection to sync storage
+    if (toSave.ttsVoice && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      chrome.storage.sync.set({ ttsVoice: toSave.ttsVoice, ttsVoiceGender: toSave.ttsVoice });
+    }
   }
 
   // Real-time synchronization when settings change from shortcuts or other tabs (Improvement 7)
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
+      const v = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+      if (v) {
+        currentSettings.ttsVoice = v;
+        currentSettings.ttsVoiceGender = v;
+        if (ttsVoiceSelect) ttsVoiceSelect.value = v;
+      }
+    }
     if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
       const fresh = { ...DEFAULT_SETTINGS, ...changes.va_settings.newValue, tts: true, dictionary: true };
       currentSettings = fresh;

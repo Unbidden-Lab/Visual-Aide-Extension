@@ -564,3 +564,22 @@ input[type=range] {
   background: rgba(0, 255, 204, 0.12);
   outline: none;
 }
+
+
+/* TTS Voice Preview / Test Button */
+.voice-test-btn {
+  background: transparent;
+  border: 1px solid var(--border-color, #333333);
+  color: var(--accent-color, #00ffcc);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.voice-test-btn:hover {
+  border-color: var(--accent-color, #00ffcc);
+  background: rgba(0, 255, 204, 0.08);
+}

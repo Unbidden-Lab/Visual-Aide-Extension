@@ -20,7 +20,9 @@ const DEFAULT_SETTINGS = {
   rulerHeight: 40,
   bionic: false,
   tts: true,
-  dictionary: true
+  dictionary: true,
+  ttsVoice: 'female',
+  ttsVoiceGender: 'female'
 };
 
 chrome.runtime.onInstalled.addListener(() => {

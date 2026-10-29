@@ -49,8 +49,62 @@ let currentReaderSettings = {
   fontColor: 'default',
   contrast: 'default',
   bionic: false,
-  ruler: false
+  ruler: false,
+  ttsVoice: 'female'
 };
+
+// -------------------------------------------------------------
+// Natural Neural Voice Matcher (Aria for Female, Guy for Male)
+// -------------------------------------------------------------
+function getResolvedVoice(voices, gender = 'female') {
+  if (!voices || voices.length === 0) return null;
+  const isFemale = (gender || 'female').toLowerCase() === 'female';
+
+  const femalePriority = [
+    // 1. Aria neural natural (Edge / Windows / Azure)
+    v => /\baria\b/i.test(v.name),
+    // 2. Jenny or other natural female voices
+    v => /\b(jenny|michelle|ana|sonia|libby)\b/i.test(v.name),
+    // 3. Online/Natural female
+    v => /(natural|online)/i.test(v.name) && /(female|woman)/i.test(v.name),
+    // 4. Known female system voices
+    v => /(zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa)/i.test(v.name),
+    // 5. Explicit female label
+    v => /female/i.test(v.name),
+    // 6. English voice that is not explicitly male
+    v => v.lang.startsWith('en') && !/(guy|david|mark|george|christopher|alex|daniel|fred|richard|james|eric|roger|ryan|steffan|oliver|ravi|\bmale\b|\bman\b)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const malePriority = [
+    // 1. Guy neural natural (Edge / Windows / Azure)
+    v => /\bguy\b/i.test(v.name),
+    // 2. Christopher, Eric, Roger or other natural male voices
+    v => /\b(christopher|eric|roger|ryan|steffan)\b/i.test(v.name),
+    // 3. Online/Natural male
+    v => /(natural|online)/i.test(v.name) && /(?<!fe)male|\bman\b/i.test(v.name),
+    // 4. Known male system voices
+    v => /(david|mark|george|alex|daniel|fred|richard|james|oliver|ravi)/i.test(v.name),
+    // 5. Explicit male label (not female)
+    v => /(?<!fe)male|\bman\b/i.test(v.name),
+    // 6. English voice that is not explicitly female
+    v => v.lang.startsWith('en') && !/(aria|jenny|michelle|ana|sonia|libby|zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa|female|woman)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const matchers = isFemale ? femalePriority : malePriority;
+  for (const matcher of matchers) {
+    const found = voices.find(matcher);
+    if (found) return found;
+  }
+  return voices[0];
+}
 
 let currentPdfDocument = null;
 let currentLoadedPages = [];
@@ -127,6 +181,18 @@ function initNetworkStatus() {
 // Settings Initialization & Sync with Extension
 // -------------------------------------------------------------
 function initSettingsSync() {
+  // Query sync storage for voice selection
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+      const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
+      if (syncVoice) {
+        currentReaderSettings.ttsVoice = syncVoice;
+        const voiceSelect = document.getElementById('reader-tts-voice');
+        if (voiceSelect) voiceSelect.value = syncVoice;
+      }
+    });
+  }
+
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['va_settings'], (result) => {
       if (result.va_settings) {
@@ -139,6 +205,7 @@ function initSettingsSync() {
         if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
         if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
         if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
+        if (s.ttsVoice && !currentReaderSettings.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
         applyAllReaderStyles();
         updateToolbarUI();
       }
@@ -146,6 +213,14 @@ function initSettingsSync() {
 
     if (chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
+          const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+          if (syncVoice) {
+            currentReaderSettings.ttsVoice = syncVoice;
+            const voiceSelect = document.getElementById('reader-tts-voice');
+            if (voiceSelect) voiceSelect.value = syncVoice;
+          }
+        }
         if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
           const s = changes.va_settings.newValue;
           if (s.font) currentReaderSettings.font = s.font;
@@ -156,6 +231,7 @@ function initSettingsSync() {
           if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
           if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
           if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
+          if (s.ttsVoice && !changes.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
           applyAllReaderStyles();
           updateToolbarUI();
         }
@@ -168,19 +244,35 @@ function initSettingsSync() {
 }
 
 function saveReaderSettings() {
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['va_settings'], (result) => {
-      const existing = result.va_settings || {};
-      existing.font = currentReaderSettings.font;
-      existing.tracking = currentReaderSettings.tracking;
-      existing.spacing = currentReaderSettings.spacing;
-      existing.leading = currentReaderSettings.leading;
-      existing.fontColor = currentReaderSettings.fontColor;
-      existing.contrastMode = currentReaderSettings.contrast;
-      existing.bionic = currentReaderSettings.bionic;
-      existing.ruler = currentReaderSettings.ruler;
-      chrome.storage.local.set({ va_settings: existing });
-    });
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    // Save voice to sync storage
+    if (chrome.storage.sync) {
+      chrome.storage.sync.set({
+        ttsVoice: currentReaderSettings.ttsVoice || 'female',
+        ttsVoiceGender: currentReaderSettings.ttsVoice || 'female'
+      }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+        }
+      });
+    }
+
+    if (chrome.storage.local) {
+      chrome.storage.local.get(['va_settings'], (result) => {
+        const existing = result.va_settings || {};
+        existing.font = currentReaderSettings.font;
+        existing.tracking = currentReaderSettings.tracking;
+        existing.spacing = currentReaderSettings.spacing;
+        existing.leading = currentReaderSettings.leading;
+        existing.fontColor = currentReaderSettings.fontColor;
+        existing.contrastMode = currentReaderSettings.contrast;
+        existing.bionic = currentReaderSettings.bionic;
+        existing.ruler = currentReaderSettings.ruler;
+        existing.ttsVoice = currentReaderSettings.ttsVoice || 'female';
+        existing.ttsVoiceGender = currentReaderSettings.ttsVoice || 'female';
+        chrome.storage.local.set({ va_settings: existing });
+      });
+    }
   }
 }
 
@@ -296,6 +388,15 @@ function initToolbarControls() {
   document.getElementById('reader-tts-play').addEventListener('click', handleTtsPlay);
   document.getElementById('reader-tts-stop').addEventListener('click', handleTtsStop);
 
+  // TTS Voice selector
+  const voiceSelect = document.getElementById('reader-tts-voice');
+  if (voiceSelect) {
+    voiceSelect.addEventListener('change', (e) => {
+      currentReaderSettings.ttsVoice = e.target.value;
+      saveReaderSettings();
+    });
+  }
+
   // Multi-page navigation (Improvement 2)
   const prevBtn = document.getElementById('reader-page-prev');
   if (prevBtn) prevBtn.addEventListener('click', goToPreviousPage);
@@ -352,6 +453,9 @@ function updateToolbarUI() {
 
   const rulerEl = document.getElementById('reader-ruler-toggle');
   if (rulerEl) rulerEl.checked = Boolean(currentReaderSettings.ruler);
+
+  const voiceEl = document.getElementById('reader-tts-voice');
+  if (voiceEl) voiceEl.value = currentReaderSettings.ttsVoice || 'female';
 }
 
 function applyAllReaderStyles() {
@@ -897,11 +1001,10 @@ function playNextReaderTtsChunk() {
   ttsUtterance.lang = navigator.language || 'en-US';
 
   const voices = window.speechSynthesis.getVoices();
-  if (voices && voices.length > 0) {
-    const preferred = voices.find(v => v.lang.startsWith(navigator.language.slice(0, 2)) && !v.localService) ||
-                      voices.find(v => v.lang.startsWith('en')) ||
-                      voices[0];
-    if (preferred) ttsUtterance.voice = preferred;
+  const preferredVoice = getResolvedVoice(voices, currentReaderSettings.ttsVoice || 'female');
+  if (preferredVoice) {
+    ttsUtterance.voice = preferredVoice;
+    if (preferredVoice.lang) ttsUtterance.lang = preferredVoice.lang;
   }
 
   // Prevent Chromium garbage-collection bug while utterance is speaking
@@ -1093,11 +1196,10 @@ async function openDictionaryModal(word) {
           u.rate = 0.85;
           u.lang = navigator.language || 'en-US';
           const voices = window.speechSynthesis.getVoices();
-          if (voices && voices.length > 0) {
-            const preferred = voices.find(v => v.lang.startsWith(navigator.language.slice(0, 2)) && !v.localService) ||
-                              voices.find(v => v.lang.startsWith('en')) ||
-                              voices[0];
-            if (preferred) u.voice = preferred;
+          const preferredVoice = getResolvedVoice(voices, currentReaderSettings.ttsVoice || 'female');
+          if (preferredVoice) {
+            u.voice = preferredVoice;
+            if (preferredVoice.lang) u.lang = preferredVoice.lang;
           }
           activeReaderUtterances.add(u);
           u.onend = () => activeReaderUtterances.delete(u);

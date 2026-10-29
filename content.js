@@ -70,8 +70,63 @@ let currentSettings = {
   rulerHeight: 40,
   bionic: false,
   tts: true,
-  dictionary: true
+  dictionary: true,
+  ttsVoice: 'female',
+  ttsVoiceGender: 'female'
 };
+
+// -------------------------------------------------------------
+// Natural Neural Voice Matcher (Aria for Female, Guy for Male)
+// -------------------------------------------------------------
+function getResolvedVoice(voices, gender = 'female') {
+  if (!voices || voices.length === 0) return null;
+  const isFemale = (gender || 'female').toLowerCase() === 'female';
+
+  const femalePriority = [
+    // 1. Aria neural natural (Edge / Windows / Azure)
+    v => /\baria\b/i.test(v.name),
+    // 2. Jenny or other natural female voices
+    v => /\b(jenny|michelle|ana|sonia|libby)\b/i.test(v.name),
+    // 3. Online/Natural female
+    v => /(natural|online)/i.test(v.name) && /(female|woman)/i.test(v.name),
+    // 4. Known female system voices
+    v => /(zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa)/i.test(v.name),
+    // 5. Explicit female label
+    v => /female/i.test(v.name),
+    // 6. English voice that is not explicitly male
+    v => v.lang.startsWith('en') && !/(guy|david|mark|george|christopher|alex|daniel|fred|richard|james|eric|roger|ryan|steffan|oliver|ravi|\bmale\b|\bman\b)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const malePriority = [
+    // 1. Guy neural natural (Edge / Windows / Azure)
+    v => /\bguy\b/i.test(v.name),
+    // 2. Christopher, Eric, Roger or other natural male voices
+    v => /\b(christopher|eric|roger|ryan|steffan)\b/i.test(v.name),
+    // 3. Online/Natural male
+    v => /(natural|online)/i.test(v.name) && /(?<!fe)male|\bman\b/i.test(v.name),
+    // 4. Known male system voices
+    v => /(david|mark|george|alex|daniel|fred|richard|james|oliver|ravi)/i.test(v.name),
+    // 5. Explicit male label (not female)
+    v => /(?<!fe)male|\bman\b/i.test(v.name),
+    // 6. English voice that is not explicitly female
+    v => v.lang.startsWith('en') && !/(aria|jenny|michelle|ana|sonia|libby|zira|samantha|victoria|karen|susan|hazel|heera|moira|tessa|female|woman)/i.test(v.name),
+    // 7. Any English voice
+    v => v.lang.startsWith('en'),
+    // 8. Any voice
+    () => true
+  ];
+
+  const matchers = isFemale ? femalePriority : malePriority;
+  for (const matcher of matchers) {
+    const found = voices.find(matcher);
+    if (found) return found;
+  }
+  return voices[0];
+}
 
 let rulerEl = null;
 let rulerRafId = null;
@@ -1131,6 +1186,15 @@ function playNextTtsChunk() {
   currentUtterance.rate = 0.95;
   currentUtterance.lang = navigator.language || 'en-US';
 
+  if (window.speechSynthesis) {
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
+    if (preferredVoice) {
+      currentUtterance.voice = preferredVoice;
+      if (preferredVoice.lang) currentUtterance.lang = preferredVoice.lang;
+    }
+  }
+
   currentUtterance.onend = () => {
     ttsActiveIndex++;
     playNextTtsChunk();
@@ -1335,6 +1399,16 @@ function applyAll(settings) {
 }
 
 function boot() {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender'], (syncRes) => {
+      const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
+      if (syncVoice) {
+        currentSettings.ttsVoice = syncVoice;
+        currentSettings.ttsVoiceGender = syncVoice;
+      }
+    });
+  }
+
   chrome.storage.local.get(['va_settings'], (result) => {
     if (result.va_settings) {
       applyAll(result.va_settings);
@@ -1351,6 +1425,13 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && (changes.ttsVoice || changes.ttsVoiceGender)) {
+    const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
+    if (syncVoice) {
+      currentSettings.ttsVoice = syncVoice;
+      currentSettings.ttsVoiceGender = syncVoice;
+    }
+  }
   if (area === 'local' && changes.va_settings?.newValue) {
     applyAll(changes.va_settings.newValue);
   }
