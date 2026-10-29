@@ -41,11 +41,11 @@ const TINT_COLORS = {
 };
 
 const CONTRAST_THEMES = {
-  cream: { bg: '#fbf0d9', text: '#222222' },
-  peach: { bg: '#fff0e5', text: '#252525' },
-  mint: { bg: '#eaf5ea', text: '#1b2a1b' },
-  navy: { bg: '#0d1b2a', text: '#ffd796' },
-  dark: { bg: '#1e1e1e', text: '#e6e6e6' },
+  cream: { bg: '#f5eedb', text: '#222222' },
+  peach: { bg: '#fae8df', text: '#26211f' },
+  mint: { bg: '#e2f0e4', text: '#1b261b' },
+  navy: { bg: '#091422', text: '#ffd796' },
+  dark: { bg: '#141414', text: '#e8e8e8' },
   inverted: { bg: '#000000', text: '#ffff00' }
 };
 
@@ -84,6 +84,7 @@ let ttsActiveIndex = 0;
 let ttsHeartbeatTimer = null;
 let activeTtsBtn = null;
 let overlayEl = null;
+let irlenVeilEl = null;
 let actionBadge = null;
 let dictModal = null;
 let currentUtterance = null;
@@ -124,7 +125,15 @@ function setupStyleBlock() {
   if (!currentSettings.isActive) {
     styleEl.textContent = '';
     document.documentElement.style.removeProperty('--va-font-size-scale');
-    document.documentElement.classList.remove('va-active', 'va-contrast-active', 'va-font-color-active');
+    document.documentElement.classList.remove(
+      'va-active',
+      'va-contrast-active',
+      'va-contrast-dark',
+      'va-contrast-navy',
+      'va-contrast-inverted',
+      'va-font-color-active'
+    );
+    updateIrlenContrast('default');
     updateRuler(false);
     updateOverlay(0);
     removeBionicReading();
@@ -181,50 +190,59 @@ function setupStyleBlock() {
     `;
   }
 
-  // Irlen Color Contrast & Background Handling
-  let contrastRules = '';
-  if (currentSettings.contrastMode && currentSettings.contrastMode !== 'default') {
-    document.documentElement.classList.add('va-contrast-active');
-    const resolvedBg = currentSettings.contrastMode === 'custom'
-      ? (currentSettings.customBgColor || '#fbf0d9')
-      : (CONTRAST_THEMES[currentSettings.contrastMode]?.bg || '#fbf0d9');
+  // Irlen Contrast Engine & Non-Destructive Filtering
+  updateIrlenContrast(currentSettings.contrastMode, currentSettings.customBgColor);
 
-    contrastRules = `
-      html.va-contrast-active,
-      html.va-contrast-active body {
-        background-color: ${resolvedBg} !important;
-        background-image: none !important;
-      }
-      html.va-contrast-active :is(main, [role="main"], article, section) {
-        background-color: ${resolvedBg} !important;
-      }
-      /* Clean text background without breaking opaque cards or modals */
-      html.va-contrast-active :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd, span):not([class*="badge"]):not([class*="chip"]):not([class*="tag"]):not([class*="btn"]):not(button) {
-        background-color: transparent !important;
-      }
-    `;
-  } else {
-    document.documentElement.classList.remove('va-contrast-active');
-  }
+  const resolvedBg = currentSettings.contrastMode === 'custom'
+    ? (currentSettings.customBgColor || '#f5eedb')
+    : (CONTRAST_THEMES[currentSettings.contrastMode]?.bg || '#f5eedb');
 
-  // Font Color Handling
+  let contrastRules = `
+    /* Soft tint root canvas blend */
+    html.va-contrast-active:not(.va-contrast-dark):not(.va-contrast-navy):not(.va-contrast-inverted),
+    html.va-contrast-active:not(.va-contrast-dark):not(.va-contrast-navy):not(.va-contrast-inverted) body {
+      background-color: ${resolvedBg} !important;
+    }
+
+    /* Universal Dark & Inverted Irlen Contrast Modes */
+    html.va-contrast-dark {
+      filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(0.95) !important;
+      background-color: #141414 !important;
+    }
+    html.va-contrast-navy {
+      filter: invert(0.92) hue-rotate(205deg) brightness(0.92) contrast(1.05) !important;
+      background-color: #091422 !important;
+    }
+    html.va-contrast-inverted {
+      filter: invert(1) hue-rotate(180deg) !important;
+      background-color: #000000 !important;
+    }
+
+    /* Counter-invert media so images, videos, and graphics appear natural */
+    html:is(.va-contrast-dark, .va-contrast-navy, .va-contrast-inverted) :is(img, video, canvas, [style*="background-image"]:not(body)) {
+      filter: invert(1) hue-rotate(180deg) !important;
+    }
+
+    /* Counter-invert extension UI components so modals, badges, and rulers maintain design integrity */
+    html:is(.va-contrast-dark, .va-contrast-navy, .va-contrast-inverted) :is(#va-action-badge, #va-dict-modal, #visual-aide-ruler, #visual-aide-overlay) {
+      filter: invert(1) hue-rotate(180deg) !important;
+    }
+  `;
+
+  // Font Color Handling (Only applied when user explicitly selects a custom font color)
   let fontColorRules = '';
   let resolvedFontColor = null;
   if (currentSettings.fontColor && currentSettings.fontColor !== 'default') {
     resolvedFontColor = currentSettings.fontColor === 'custom'
       ? (currentSettings.customFontColor || '#111111')
       : currentSettings.fontColor;
-  } else if (currentSettings.contrastMode && currentSettings.contrastMode !== 'default') {
-    resolvedFontColor = currentSettings.contrastMode === 'custom'
-      ? (currentSettings.customFontColor || '#111111')
-      : (CONTRAST_THEMES[currentSettings.contrastMode]?.text || '#222222');
   }
 
   if (resolvedFontColor) {
     document.documentElement.classList.add('va-font-color-active');
     fontColorRules = `
-      html.va-font-color-active body,
-      html.va-font-color-active :is(p, h1, h2, h3, h4, h5, h6, span, a, li, td, th, dt, dd, blockquote, label, button, b, strong, .va-bionic-fix, input:not([type="checkbox"]):not([type="radio"]), textarea):not([class*="icon"]):not([class*="fa"]):not([class*="material"]):not(svg *) {
+      /* Apply font color specifically to content reading text, preserving button & link contrast */
+      html.va-font-color-active :is(p, h1, h2, h3, h4, h5, h6, li, dt, dd, blockquote, [dir="auto"]):not([class*="badge"]):not([class*="chip"]):not([class*="tag"]):not([class*="btn"]):not(button):not(a) {
         color: ${resolvedFontColor} !important;
         -webkit-text-fill-color: ${resolvedFontColor} !important;
       }
@@ -483,6 +501,81 @@ function setupStyleBlock() {
   } else {
     removeBionicReading();
   }
+}
+
+// -------------------------------------------------------------
+// Irlen Spectral Veil & Contrast Engine
+// Non-destructive optical tinting via viewport blend multiply
+// and high-fidelity media-preserving dark filter inversion.
+// -------------------------------------------------------------
+function updateIrlenContrast(mode, customBg) {
+  const root = document.documentElement;
+
+  // Clear previous contrast mode classes
+  root.classList.remove(
+    'va-contrast-active',
+    'va-contrast-dark',
+    'va-contrast-navy',
+    'va-contrast-inverted'
+  );
+
+  if (!currentSettings.isActive || !mode || mode === 'default') {
+    if (irlenVeilEl) irlenVeilEl.style.display = 'none';
+    return;
+  }
+
+  // Dark & Inverted modes: use high-fidelity universal filter inversion
+  if (mode === 'dark') {
+    if (irlenVeilEl) irlenVeilEl.style.display = 'none';
+    root.classList.add('va-contrast-active', 'va-contrast-dark');
+    return;
+  }
+
+  if (mode === 'navy') {
+    if (irlenVeilEl) irlenVeilEl.style.display = 'none';
+    root.classList.add('va-contrast-active', 'va-contrast-navy');
+    return;
+  }
+
+  if (mode === 'inverted') {
+    if (irlenVeilEl) irlenVeilEl.style.display = 'none';
+    root.classList.add('va-contrast-active', 'va-contrast-inverted');
+    return;
+  }
+
+  // Soft Tint Modes: Cream, Peach, Mint, or Custom
+  root.classList.add('va-contrast-active');
+
+  const tintMap = {
+    cream: '#f5eedb',
+    peach: '#fae8df',
+    mint: '#e2f0e4'
+  };
+
+  const tintColor = tintMap[mode] || customBg || '#f5eedb';
+
+  if (!irlenVeilEl) {
+    irlenVeilEl = document.createElement('div');
+    irlenVeilEl.id = 'va-irlen-veil';
+  }
+  if (!irlenVeilEl.isConnected) {
+    (document.body || root).appendChild(irlenVeilEl);
+  }
+
+  Object.assign(irlenVeilEl.style, {
+    display: 'block',
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '100vw',
+    height: '100vh',
+    pointerEvents: 'none',
+    zIndex: '2147483640',
+    backgroundColor: tintColor,
+    mixBlendMode: 'multiply',
+    opacity: '1',
+    transition: 'background-color 0.25s ease'
+  });
 }
 
 // -------------------------------------------------------------
