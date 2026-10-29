@@ -812,3 +812,121 @@ body.contrast-inverted {
   margin: 0;
   font-family: system-ui, sans-serif !important;
 }
+
+/* -------------------------------------------------------------
+ * Accessible Interactive Tooltips
+ * ------------------------------------------------------------- */
+.reader-tooltip {
+  position: fixed;
+  z-index: 100000;
+  pointer-events: none;
+  background: #181818;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  border-radius: 6px;
+  padding: 7px 11px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  max-width: 220px;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+}
+
+.reader-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reader-tooltip-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--accent, #00ffcc);
+  margin-bottom: 2px;
+}
+
+.reader-tooltip-desc {
+  display: block;
+  color: #cccccc;
+  font-size: 0.72rem;
+}
+
+/* Tooltip Irlen Theme Adaptations */
+body.contrast-cream .reader-tooltip {
+  background: #fbf5e6;
+  color: #222222;
+  border-color: #d8ceb0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+body.contrast-cream .reader-tooltip-title {
+  color: #7a5010;
+}
+body.contrast-cream .reader-tooltip-desc {
+  color: #444444;
+}
+
+body.contrast-peach .reader-tooltip {
+  background: #fff1e8;
+  color: #26211f;
+  border-color: #e2c2b0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+body.contrast-peach .reader-tooltip-title {
+  color: #8c3f20;
+}
+body.contrast-peach .reader-tooltip-desc {
+  color: #4a3e39;
+}
+
+body.contrast-mint .reader-tooltip {
+  background: #ecf7ed;
+  color: #1b261b;
+  border-color: #b5d6bb;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+body.contrast-mint .reader-tooltip-title {
+  color: #1a632b;
+}
+body.contrast-mint .reader-tooltip-desc {
+  color: #3b4d3e;
+}
+
+body.contrast-navy .reader-tooltip {
+  background: #0d1e33;
+  color: #e0e8f0;
+  border-color: #1e3a5f;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+body.contrast-navy .reader-tooltip-title {
+  color: #ffd796;
+}
+body.contrast-navy .reader-tooltip-desc {
+  color: #ccd7e4;
+}
+
+body.contrast-dark .reader-tooltip {
+  background: #1c1c1c;
+  color: #e6e6e6;
+  border-color: #383838;
+}
+body.contrast-dark .reader-tooltip-title {
+  color: #00ffcc;
+}
+
+body.contrast-inverted .reader-tooltip {
+  background: #000000;
+  color: #ffffff;
+  border-color: #ffff00;
+}
+body.contrast-inverted .reader-tooltip-title {
+  color: #ffff00;
+}
+body.contrast-inverted .reader-tooltip-desc {
+  color: #ffffff;
+}

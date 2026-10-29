@@ -31,6 +31,7 @@
     <div id="controls-container">
       <!-- Presets -->
       <div class="section-title">Severity Presets</div>
+      <span class="section-desc">One-click visual accommodation profiles</span>
       <div class="level-group" role="group" aria-label="Severity presets">
         <button class="level-btn" data-level="1" aria-pressed="false">L1: Mild</button>
         <button class="level-btn" data-level="2" aria-pressed="false">L2: Mod</button>
@@ -45,6 +46,7 @@
       <div class="control-card">
         <div class="slider-group">
           <label for="font-family">Typeface</label>
+          <span class="control-desc">Dyslexia-friendly and high-legibility fonts</span>
           <select id="font-family" class="custom-select">
             <option value="OpenDyslexic">OpenDyslexic (Specialized)</option>
             <option value="Lexend">Lexend (Reading Fluency)</option>
@@ -60,6 +62,7 @@
         <!-- Font Color Selection -->
         <div class="slider-group">
           <label for="font-color">Font Color</label>
+          <span class="control-desc">High-contrast text shades for optimal legibility</span>
           <select id="font-color" class="custom-select">
             <option value="default">Default</option>
             <option value="#111111">Deep Black (#111111)</option>
@@ -73,6 +76,7 @@
         <!-- Irlen Color Contrast Presets -->
         <div class="slider-group">
           <label for="contrast-mode">Color Contrast (Irlen Support)</label>
+          <span class="control-desc">Soothing background tints to reduce visual stress and glare</span>
           <select id="contrast-mode" class="custom-select">
             <option value="default">Website Default</option>
             <option value="cream">Soft Cream (Dark on Warm Amber)</option>
@@ -90,6 +94,7 @@
             <label for="font-size">Font Size</label>
             <span class="val-badge" id="font-size-val">100%</span>
           </div>
+          <span class="control-desc">Scales reading text proportionally across the page</span>
           <select id="font-size-select" class="custom-select" style="margin-bottom: 8px;">
             <option value="100">100% (Default Size)</option>
             <option value="105">105% (Subtle)</option>
@@ -110,6 +115,7 @@
             <label for="tracking">Tracking (Letter Space)</label>
             <span class="val-badge" id="tracking-val">0px</span>
           </div>
+          <span class="control-desc">Expands character spacing to prevent letter crowding</span>
           <input type="range" id="tracking" min="0" max="6" step="0.25" value="0">
         </div>
 
@@ -119,6 +125,7 @@
             <label for="spacing">Spacing (Word Space)</label>
             <span class="val-badge" id="spacing-val">0px</span>
           </div>
+          <span class="control-desc">Widens spacing between words to enhance separation</span>
           <input type="range" id="spacing" min="0" max="12" step="0.5" value="0">
         </div>
 
@@ -128,6 +135,7 @@
             <label for="leading">Leading (Line Height)</label>
             <span class="val-badge" id="leading-val">1.5x</span>
           </div>
+          <span class="control-desc">Increases vertical line spacing to prevent line skipping</span>
           <input type="range" id="leading" min="1.0" max="2.8" step="0.1" value="1.5">
         </div>
 
@@ -137,6 +145,7 @@
             <label for="paragraph-spacing">Paragraph Spacing</label>
             <span class="val-badge" id="paragraph-spacing-val">0px</span>
           </div>
+          <span class="control-desc">Adds breathing room between paragraphs</span>
           <input type="range" id="paragraph-spacing" min="0" max="24" step="2" value="0">
         </div>
 
@@ -144,7 +153,7 @@
         <div class="switch-row">
           <div class="switch-info">
             <span class="switch-title">Left-Align Text</span>
-            <span class="switch-desc">Eliminates uneven word rivers</span>
+            <span class="switch-desc">Eliminates uneven word rivers and justification artifacts</span>
           </div>
           <label class="toggle-switch small">
             <input type="checkbox" id="left-align-toggle">
@@ -163,7 +172,7 @@
         <div class="switch-row">
           <div class="switch-info">
             <span class="switch-title">Bionic Reading</span>
-            <span class="switch-desc">Guides saccadic eye jumps</span>
+            <span class="switch-desc">Bolds initial word fixations to guide saccadic eye flow</span>
           </div>
           <label class="toggle-switch small">
             <input type="checkbox" id="bionic-toggle">
@@ -179,11 +188,13 @@
             <label for="overlay">Glare Tint Intensity</label>
             <span class="val-badge" id="overlay-val">0%</span>
           </div>
+          <span class="control-desc">Full-screen color overlay to ease sensory overload</span>
           <input type="range" id="overlay" min="0" max="0.75" step="0.05" value="0">
         </div>
 
         <div class="tint-palette-group">
           <span class="sub-label">Tint Spectrum</span>
+          <span class="control-desc">Spectral filter hues to alleviate optical distortions</span>
           <div class="color-chips" id="tint-palette">
             <button type="button" class="color-chip active" data-color="amber" style="--chip-color: #ffd796;" title="Warm Amber"></button>
             <button type="button" class="color-chip" data-color="peach" style="--chip-color: #ffcdb4;" title="Warm Peach"></button>
@@ -200,7 +211,7 @@
         <div class="switch-row">
           <div class="switch-info">
             <span class="switch-title">Reading Guide</span>
-            <span class="switch-desc">Cursor-guided focus band</span>
+            <span class="switch-desc">Cursor-guided focus bar or reading mask</span>
           </div>
           <label class="toggle-switch small">
             <input type="checkbox" id="ruler-toggle">
@@ -218,6 +229,7 @@
               <label for="ruler-height">Guide Slot Height</label>
               <span class="val-badge" id="ruler-height-val">40px</span>
             </div>
+            <span class="control-desc">Height of the visible focus reading band</span>
             <input type="range" id="ruler-height" min="20" max="80" step="5" value="40">
           </div>
         </div>

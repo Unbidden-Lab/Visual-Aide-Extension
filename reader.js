@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDropZone();
   initReaderInteractions();
   initDictionarySearch();
+  initReaderTooltips();
 });
 
 // -------------------------------------------------------------
@@ -678,9 +679,9 @@ function displayExtractedPages(docTitle) {
     const bottomNav = document.createElement('div');
     bottomNav.className = 'reader-pagination-bar';
     bottomNav.innerHTML = `
-      <button class="reader-page-btn" id="bottom-page-prev" ${currentReaderPageIndex <= 1 ? 'disabled' : ''} aria-label="Go to previous page">Previous Page</button>
+      <button class="reader-page-btn" id="bottom-page-prev" ${currentReaderPageIndex <= 1 ? 'disabled' : ''} aria-label="Go to previous page" data-tooltip-title="Previous Page" data-tooltip-desc="Return to the previous page">Previous Page</button>
       <span class="reader-page-counter">Page ${currentReaderPageIndex} of ${totalPages}</span>
-      <button class="reader-page-btn" id="bottom-page-next" ${currentReaderPageIndex >= totalPages ? 'disabled' : ''} aria-label="Go to next page">Next Page</button>
+      <button class="reader-page-btn" id="bottom-page-next" ${currentReaderPageIndex >= totalPages ? 'disabled' : ''} aria-label="Go to next page" data-tooltip-title="Next Page" data-tooltip-desc="Advance to the next page">Next Page</button>
     `;
     docContainer.appendChild(bottomNav);
 
@@ -1130,3 +1131,100 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// -------------------------------------------------------------
+// Interactive Tooltips Engine
+// -------------------------------------------------------------
+function initReaderTooltips() {
+  let tooltipEl = document.getElementById('reader-tooltip');
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div');
+    tooltipEl.id = 'reader-tooltip';
+    tooltipEl.className = 'reader-tooltip';
+    tooltipEl.setAttribute('role', 'tooltip');
+    tooltipEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(tooltipEl);
+  }
+
+  let activeTarget = null;
+  let showTimer = null;
+
+  function showTooltip(target) {
+    if (!target) return;
+    const title = target.getAttribute('data-tooltip-title') || '';
+    const desc = target.getAttribute('data-tooltip-desc') || target.getAttribute('data-tooltip') || '';
+    if (!desc && !title) return;
+
+    activeTarget = target;
+    tooltipEl.innerHTML = `
+      ${title ? `<span class="reader-tooltip-title">${title}</span>` : ''}
+      ${desc ? `<span class="reader-tooltip-desc">${desc}</span>` : ''}
+    `;
+
+    // Position tooltip relative to target element
+    const rect = target.getBoundingClientRect();
+    const tooltipWidth = 220;
+    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+    let top = rect.bottom + 8;
+
+    // Viewport edge containment
+    if (left < 10) left = 10;
+    if (left + tooltipWidth > window.innerWidth - 10) {
+      left = window.innerWidth - tooltipWidth - 10;
+    }
+
+    // If bottom edge overflow, flip tooltip above target
+    if (top + 65 > window.innerHeight) {
+      top = Math.max(10, rect.top - 60);
+    }
+
+    tooltipEl.style.left = `${Math.round(left)}px`;
+    tooltipEl.style.top = `${Math.round(top)}px`;
+    tooltipEl.classList.add('visible');
+    tooltipEl.setAttribute('aria-hidden', 'false');
+  }
+
+  function hideTooltip() {
+    activeTarget = null;
+    clearTimeout(showTimer);
+    tooltipEl.classList.remove('visible');
+    tooltipEl.setAttribute('aria-hidden', 'true');
+  }
+
+  document.addEventListener('mouseover', (e) => {
+    const target = e.target.closest('[data-tooltip-desc], [data-tooltip], [data-tooltip-title]');
+    if (target && target !== activeTarget) {
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => showTooltip(target), 120);
+    }
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const target = e.target.closest('[data-tooltip-desc], [data-tooltip], [data-tooltip-title]');
+    if (target) {
+      const related = e.relatedTarget ? e.relatedTarget.closest('[data-tooltip-desc], [data-tooltip], [data-tooltip-title]') : null;
+      if (related !== target) {
+        hideTooltip();
+      }
+    }
+  });
+
+  // Accessible keyboard focus support
+  document.addEventListener('focusin', (e) => {
+    const target = e.target.closest('[data-tooltip-desc], [data-tooltip], [data-tooltip-title]');
+    if (target) {
+      clearTimeout(showTimer);
+      showTooltip(target);
+    }
+  });
+
+  document.addEventListener('focusout', (e) => {
+    const target = e.target.closest('[data-tooltip-desc], [data-tooltip], [data-tooltip-title]');
+    if (target) {
+      hideTooltip();
+    }
+  });
+
+  // Hide on scroll to prevent detached floating tooltips
+  window.addEventListener('scroll', hideTooltip, { passive: true });
+}

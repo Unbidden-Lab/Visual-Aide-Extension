@@ -15,11 +15,11 @@
         <h1>VISUAL AIDE <span class="badge-tag">PDF READER</span></h1>
       </div>
       <div class="header-controls">
-        <span id="network-status" class="status-badge online" title="Network status">
+        <span id="network-status" class="status-badge online" data-tooltip-title="Connection Status" data-tooltip-desc="Visual Aide operates fully offline without transmitting your data">
           <span class="dot"></span> <span id="network-text">Online Mode</span>
         </span>
-        <button id="upload-nav-btn" class="action-btn">Open PDF</button>
-        <button id="print-btn" class="action-btn" title="Print with current typography">Print</button>
+        <button id="upload-nav-btn" class="action-btn" data-tooltip-title="Open PDF" data-tooltip-desc="Load a new PDF document into the accessible reader">Open PDF</button>
+        <button id="print-btn" class="action-btn" data-tooltip-title="Print Document" data-tooltip-desc="Print or export to PDF with current typography and contrast settings">Print</button>
       </div>
     </div>
 
@@ -27,7 +27,7 @@
     <div class="toolbar-scroll">
       <div class="accommodation-bar">
         <!-- Font Selection -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
           <label for="reader-font">Typeface</label>
           <select id="reader-font" class="tool-select">
             <option value="OpenDyslexic">OpenDyslexic</option>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Font Size Zoom -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Font Size" data-tooltip-desc="Scale text size up or down for comfortable reading">
           <label>Size</label>
           <div class="btn-group">
             <button id="font-decrease-btn" class="tool-btn" title="Decrease font size" aria-label="Decrease font size">A-</button>
@@ -51,7 +51,7 @@
         </div>
 
         <!-- Tracking (Letter Space) -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Letter Tracking" data-tooltip-desc="Expand letter spacing to prevent character crowding and blurring">
           <div class="tool-label-row">
             <label for="reader-tracking">Tracking</label>
             <span id="reader-tracking-val" class="tool-badge">0px</span>
@@ -60,7 +60,7 @@
         </div>
 
         <!-- Spacing (Word Space) -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Word Spacing" data-tooltip-desc="Increase space between words to improve word boundary separation">
           <div class="tool-label-row">
             <label for="reader-spacing">Word Space</label>
             <span id="reader-spacing-val" class="tool-badge">0px</span>
@@ -69,7 +69,7 @@
         </div>
 
         <!-- Leading (Line Height) -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Line Height (Leading)" data-tooltip-desc="Add vertical space between lines to prevent line skipping and fatigue">
           <div class="tool-label-row">
             <label for="reader-leading">Leading</label>
             <span id="reader-leading-val" class="tool-badge">1.6x</span>
@@ -78,7 +78,7 @@
         </div>
 
         <!-- Font Color -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Font Color" data-tooltip-desc="Choose high-contrast or softened text colors to ease eye strain">
           <label for="reader-font-color">Font Color</label>
           <select id="reader-font-color" class="tool-select">
             <option value="default">Default</option>
@@ -91,7 +91,7 @@
         </div>
 
         <!-- Irlen Color Contrast Presets -->
-        <div class="tool-item">
+        <div class="tool-item" data-tooltip-title="Irlen Contrast" data-tooltip-desc="Apply soothing spectral background tints to eliminate glare and visual stress">
           <label for="reader-contrast">Irlen Contrast</label>
           <select id="reader-contrast" class="tool-select">
             <option value="default">Default White</option>
@@ -106,18 +106,18 @@
 
         <!-- Toggles: Bionic & Ruler -->
         <div class="tool-item tool-toggles">
-          <label class="checkbox-label" title="Bold first letters of words to guide eye flow">
+          <label class="checkbox-label" data-tooltip-title="Bionic Reading" data-tooltip-desc="Bolds initial word fixations to guide rapid saccadic eye movements">
             <input type="checkbox" id="reader-bionic-toggle">
             <span>Bionic Read</span>
           </label>
-          <label class="checkbox-label" title="Focus line ruler tracking your mouse">
+          <label class="checkbox-label" data-tooltip-title="Focus Ruler" data-tooltip-desc="Interactive reading guide bar following the mouse cursor">
             <input type="checkbox" id="reader-ruler-toggle">
             <span>Focus Ruler</span>
           </label>
         </div>
 
         <!-- Text-to-Speech Player Controls -->
-        <div class="tool-item tts-player">
+        <div class="tool-item tts-player" data-tooltip-title="Read Aloud (TTS)" data-tooltip-desc="Listen to the current page or highlighted selection read aloud">
           <label>Read Aloud</label>
           <div class="btn-group">
             <button id="reader-tts-play" class="tool-btn icon-btn" title="Read aloud" aria-label="Play text-to-speech">Play</button>
@@ -126,7 +126,7 @@
         </div>
 
         <!-- Multi-Page Navigation Bar (Improvement 2) -->
-        <div class="tool-item page-nav" id="reader-page-nav" style="display: none;">
+        <div class="tool-item page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
           <label>Page</label>
           <div class="btn-group">
             <button id="reader-page-prev" class="tool-btn icon-btn" title="Previous page" aria-label="Go to previous page" disabled>&lsaquo;</button>
@@ -136,7 +136,7 @@
         </div>
 
         <!-- Simplified Dictionary Search -->
-        <div class="tool-item dict-search-box">
+        <div class="tool-item dict-search-box" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up words in simple, plain-language definitions with pronunciation">
           <label for="dict-search-input">Simplified Dict</label>
           <div class="input-with-btn">
             <input type="text" id="dict-search-input" placeholder="Look up word...">
@@ -182,6 +182,9 @@
       <!-- Generated pages and extracted text will be inserted here -->
     </article>
   </main>
+
+  <!-- Interactive Tooltip Overlay -->
+  <div id="reader-tooltip" class="reader-tooltip" role="tooltip" aria-hidden="true"></div>
 
   <!-- Reading Ruler Overlay -->
   <div id="reader-ruler" class="reader-ruler-el hidden"></div>
