@@ -79,6 +79,104 @@ function getResolvedVoice(voices, gender = 'female') {
   return voices[0];
 }
 
+// -------------------------------------------------------------
+// Asynchronous Voice Resolver & Neural Pre-warming
+// Fixes Chromium first-read robotic voice bug by ensuring voices
+// (specifically online natural neural voices) are fully loaded
+// before the initial SpeechSynthesisUtterance is spoken.
+// -------------------------------------------------------------
+let cachedVoices = [];
+let voicesInitialized = false;
+
+function getVoicesAsync(maxWaitMs = 800) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      resolve([]);
+      return;
+    }
+
+    const immediate = window.speechSynthesis.getVoices();
+    if (immediate && immediate.length > 0) {
+      cachedVoices = immediate;
+      const hasNatural = immediate.some(v => /(natural|online|neural)/i.test(v.name));
+      if (hasNatural || voicesInitialized) {
+        voicesInitialized = true;
+        resolve(immediate);
+        return;
+      }
+    }
+
+    let settled = false;
+    let timer = null;
+    let pollInterval = null;
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      if (pollInterval) clearInterval(pollInterval);
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+    };
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      voicesInitialized = true;
+      cleanup();
+      if (result && result.length > 0) cachedVoices = result;
+      resolve(cachedVoices.length > 0 ? cachedVoices : (window.speechSynthesis.getVoices() || []));
+    };
+
+    const onVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) {
+        const nowHasNatural = v.some(voice => /(natural|online|neural)/i.test(voice.name));
+        if (nowHasNatural || !immediate || immediate.length === 0) {
+          finish(v);
+        }
+      }
+    };
+
+    window.speechSynthesis.addEventListener('voiceschanged', onVoices);
+
+    let elapsed = 0;
+    pollInterval = setInterval(() => {
+      elapsed += 40;
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+        finish(v);
+      } else if (elapsed >= maxWaitMs) {
+        finish(v && v.length > 0 ? v : immediate);
+      }
+    }, 40);
+
+    timer = setTimeout(() => {
+      const v = window.speechSynthesis.getVoices();
+      finish(v && v.length > 0 ? v : immediate);
+    }, maxWaitMs);
+
+    window.speechSynthesis.getVoices();
+  });
+}
+
+// Proactive background warm-up
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.addEventListener('voiceschanged', () => {
+    const v = window.speechSynthesis.getVoices();
+    if (v && v.length > 0) {
+      cachedVoices = v;
+      if (v.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+        voicesInitialized = true;
+      }
+    }
+  });
+  const initVoices = window.speechSynthesis.getVoices();
+  if (initVoices && initVoices.length > 0) {
+    cachedVoices = initVoices;
+    if (initVoices.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+      voicesInitialized = true;
+    }
+  }
+}
+
 const PRESETS = {
   1: {
     font: 'OpenDyslexic',
@@ -122,12 +220,7 @@ const PRESETS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.getVoices();
-    };
-    window.speechSynthesis.getVoices();
-  }
+  getVoicesAsync();
   const masterToggle = document.getElementById('master-toggle');
   const statusText = document.getElementById('status-text');
   const controlsContainer = document.getElementById('controls-container');
@@ -382,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // TTS Voice Preview Test Button
   if (ttsVoiceTestBtn) {
-    ttsVoiceTestBtn.addEventListener('click', () => {
+    ttsVoiceTestBtn.addEventListener('click', async () => {
       if (!window.speechSynthesis) return;
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -391,13 +484,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const gender = ttsVoiceSelect ? ttsVoiceSelect.value : (currentSettings.ttsVoice || 'female');
       const text = gender === 'male' ? 'Hello, this is Guy reading aloud with Visual Aide.' : 'Hello, this is Aria reading aloud with Visual Aide.';
+
+      const voices = await getVoicesAsync();
+      const preferred = getResolvedVoice(voices, gender);
+
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = parseFloat(currentSettings.ttsSpeed || 1.0);
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = getResolvedVoice(voices, gender);
       if (preferred) {
         utter.voice = preferred;
-        if (preferred.lang) utter.lang = preferred.lang;
+        utter.lang = preferred.lang || 'en-US';
+      } else {
+        utter.lang = navigator.language || 'en-US';
       }
       ttsVoiceTestBtn.textContent = 'Stop';
       utter.onend = () => {

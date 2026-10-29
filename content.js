@@ -130,6 +130,104 @@ function getResolvedVoice(voices, gender = 'female') {
   return voices[0];
 }
 
+// -------------------------------------------------------------
+// Asynchronous Voice Resolver & Neural Pre-warming
+// Fixes Chromium first-read robotic voice bug by ensuring voices
+// (specifically online natural neural voices) are fully loaded
+// before the initial SpeechSynthesisUtterance is spoken.
+// -------------------------------------------------------------
+let cachedVoices = [];
+let voicesInitialized = false;
+
+function getVoicesAsync(maxWaitMs = 800) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      resolve([]);
+      return;
+    }
+
+    const immediate = window.speechSynthesis.getVoices();
+    if (immediate && immediate.length > 0) {
+      cachedVoices = immediate;
+      const hasNatural = immediate.some(v => /(natural|online|neural)/i.test(v.name));
+      if (hasNatural || voicesInitialized) {
+        voicesInitialized = true;
+        resolve(immediate);
+        return;
+      }
+    }
+
+    let settled = false;
+    let timer = null;
+    let pollInterval = null;
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      if (pollInterval) clearInterval(pollInterval);
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+    };
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      voicesInitialized = true;
+      cleanup();
+      if (result && result.length > 0) cachedVoices = result;
+      resolve(cachedVoices.length > 0 ? cachedVoices : (window.speechSynthesis.getVoices() || []));
+    };
+
+    const onVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) {
+        const nowHasNatural = v.some(voice => /(natural|online|neural)/i.test(voice.name));
+        if (nowHasNatural || !immediate || immediate.length === 0) {
+          finish(v);
+        }
+      }
+    };
+
+    window.speechSynthesis.addEventListener('voiceschanged', onVoices);
+
+    let elapsed = 0;
+    pollInterval = setInterval(() => {
+      elapsed += 40;
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+        finish(v);
+      } else if (elapsed >= maxWaitMs) {
+        finish(v && v.length > 0 ? v : immediate);
+      }
+    }, 40);
+
+    timer = setTimeout(() => {
+      const v = window.speechSynthesis.getVoices();
+      finish(v && v.length > 0 ? v : immediate);
+    }, maxWaitMs);
+
+    window.speechSynthesis.getVoices();
+  });
+}
+
+// Proactive background warm-up
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.addEventListener('voiceschanged', () => {
+    const v = window.speechSynthesis.getVoices();
+    if (v && v.length > 0) {
+      cachedVoices = v;
+      if (v.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+        voicesInitialized = true;
+      }
+    }
+  });
+  const initVoices = window.speechSynthesis.getVoices();
+  if (initVoices && initVoices.length > 0) {
+    cachedVoices = initVoices;
+    if (initVoices.some(voice => /(natural|online|neural)/i.test(voice.name))) {
+      voicesInitialized = true;
+    }
+  }
+}
+
 let rulerEl = null;
 let rulerRafId = null;
 let lastMouseY = 0;
@@ -1171,7 +1269,7 @@ function stopTtsPlayback() {
   }
 }
 
-function playNextTtsChunk() {
+async function playNextTtsChunk() {
   if (!window.speechSynthesis || ttsActiveIndex >= ttsQueue.length) {
     stopTtsPlayback();
     return;
@@ -1184,17 +1282,21 @@ function playNextTtsChunk() {
     return;
   }
 
+  // Ensure neural/natural voices are loaded before speaking chunk
+  const voices = await getVoicesAsync();
+  if (ttsQueue.length === 0 || ttsActiveIndex >= ttsQueue.length) {
+    return;
+  }
+
   currentUtterance = new SpeechSynthesisUtterance(chunk);
   currentUtterance.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
-  currentUtterance.lang = navigator.language || 'en-US';
 
-  if (window.speechSynthesis) {
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
-    if (preferredVoice) {
-      currentUtterance.voice = preferredVoice;
-      if (preferredVoice.lang) currentUtterance.lang = preferredVoice.lang;
-    }
+  const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
+  if (preferredVoice) {
+    currentUtterance.voice = preferredVoice;
+    currentUtterance.lang = preferredVoice.lang || 'en-US';
+  } else {
+    currentUtterance.lang = navigator.language || 'en-US';
   }
 
   currentUtterance.onend = () => {
@@ -1336,10 +1438,19 @@ async function openInPageDictionary(word, x, y) {
     `;
 
     document.getElementById('va-dict-close').onclick = removeDictModal;
-    document.getElementById('va-word-speak').onclick = () => {
+    document.getElementById('va-word-speak').onclick = async () => {
       if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const voices = await getVoicesAsync();
         const u = new SpeechSynthesisUtterance(entry.word);
-        u.rate = 0.85;
+        u.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
+        const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
+        if (preferredVoice) {
+          u.voice = preferredVoice;
+          u.lang = preferredVoice.lang || 'en-US';
+        } else {
+          u.lang = 'en-US';
+        }
         window.speechSynthesis.speak(u);
       }
     };
@@ -1401,6 +1512,7 @@ function applyAll(settings) {
 }
 
 function boot() {
+  getVoicesAsync();
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
     chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
       const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
