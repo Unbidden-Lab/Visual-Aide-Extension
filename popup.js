@@ -2,6 +2,7 @@ const DEFAULT_SETTINGS = {
   isActive: true,
   level: 0,
   font: 'OpenDyslexic',
+  fontSize: 100,
   tracking: 0,
   spacing: 0,
   leading: 1.5,
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS = {
 const PRESETS = {
   1: {
     font: 'OpenDyslexic',
+    fontSize: 105,
     tracking: 1.0,
     spacing: 2.5,
     leading: 1.6,
@@ -36,6 +38,7 @@ const PRESETS = {
   },
   2: {
     font: 'OpenDyslexic',
+    fontSize: 115,
     tracking: 2.0,
     spacing: 5.0,
     leading: 1.8,
@@ -48,6 +51,7 @@ const PRESETS = {
   },
   3: {
     font: 'OpenDyslexic',
+    fontSize: 125,
     tracking: 3.5,
     spacing: 8.0,
     leading: 2.1,
@@ -71,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const fontSelect = document.getElementById('font-family');
   const fontColorSelect = document.getElementById('font-color');
   const contrastModeSelect = document.getElementById('contrast-mode');
+  const fontSizeSlider = document.getElementById('font-size');
+  const fontSizeSelect = document.getElementById('font-size-select');
+  const fontSizeVal = document.getElementById('font-size-val');
   const trackingSlider = document.getElementById('tracking');
   const spacingSlider = document.getElementById('spacing');
   const leadingSlider = document.getElementById('leading');
@@ -111,6 +118,50 @@ document.addEventListener('DOMContentLoaded', () => {
   if (openReaderBtn) {
     openReaderBtn.addEventListener('click', () => {
       chrome.tabs.create({ url: chrome.runtime.getURL('reader.html') });
+    });
+  }
+
+  function syncFontSizeUI(size) {
+    const val = parseInt(size, 10) || 100;
+    if (fontSizeSlider) fontSizeSlider.value = val;
+    if (fontSizeVal) fontSizeVal.textContent = `${val}%`;
+    if (fontSizeSelect) {
+      const match = Array.from(fontSizeSelect.options).find(opt => parseInt(opt.value, 10) === val);
+      if (match) {
+        fontSizeSelect.value = String(val);
+      } else {
+        let customOpt = fontSizeSelect.querySelector('option[data-custom="true"]');
+        if (!customOpt) {
+          customOpt = document.createElement('option');
+          customOpt.dataset.custom = "true";
+          fontSizeSelect.appendChild(customOpt);
+        }
+        customOpt.value = String(val);
+        customOpt.textContent = `${val}% (Custom)`;
+        fontSizeSelect.value = String(val);
+      }
+    }
+  }
+
+  if (fontSizeSlider) {
+    fontSizeSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      currentSettings.fontSize = val;
+      syncFontSizeUI(val);
+      currentSettings.level = 0;
+      updateLevelButtons(0);
+      saveSettings();
+    });
+  }
+
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener('change', (e) => {
+      const val = parseInt(e.target.value, 10);
+      currentSettings.fontSize = val;
+      syncFontSizeUI(val);
+      currentSettings.level = 0;
+      updateLevelButtons(0);
+      saveSettings();
     });
   }
 
@@ -251,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     fontSelect.value = settings.font || 'OpenDyslexic';
+    syncFontSizeUI(settings.fontSize || 100);
     fontColorSelect.value = settings.fontColor || 'default';
     contrastModeSelect.value = settings.contrastMode || 'default';
     trackingSlider.value = settings.tracking || 0;

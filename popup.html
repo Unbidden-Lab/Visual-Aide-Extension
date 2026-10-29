@@ -84,6 +84,26 @@
           </select>
         </div>
 
+                <!-- Font Size Scale (Slider & Dropdown) -->
+        <div class="slider-group">
+          <div class="label-row">
+            <label for="font-size">Font Size</label>
+            <span class="val-badge" id="font-size-val">100%</span>
+          </div>
+          <select id="font-size-select" class="custom-select" style="margin-bottom: 8px;">
+            <option value="100">100% (Default Size)</option>
+            <option value="105">105% (Subtle)</option>
+            <option value="110">110% (Small)</option>
+            <option value="115">115% (Medium-Light)</option>
+            <option value="120">120% (Medium)</option>
+            <option value="125">125% (Medium-Large)</option>
+            <option value="130">130% (Large)</option>
+            <option value="140">140% (Extra Large)</option>
+            <option value="150">150% (Maximum)</option>
+          </select>
+          <input type="range" id="font-size" min="90" max="160" step="5" value="100" aria-label="Font size slider">
+        </div>
+
         <!-- Tracking (Letter Space) -->
         <div class="slider-group">
           <div class="label-row">

@@ -53,6 +53,7 @@ let currentSettings = {
   isActive: true,
   level: 0,
   font: 'OpenDyslexic',
+  fontSize: 100,
   tracking: 0,
   spacing: 0,
   leading: 1.5,
@@ -100,6 +101,11 @@ function applyCssVariables() {
     root.style.removeProperty('--va-font-family');
   }
 
+  const fontSizeScale = (currentSettings.fontSize && currentSettings.fontSize !== 100)
+    ? (currentSettings.fontSize / 100)
+    : 1;
+
+  root.style.setProperty('--va-font-size-scale', String(fontSizeScale));
   root.style.setProperty('--va-tracking', String(currentSettings.tracking || 0) + 'px');
   root.style.setProperty('--va-spacing', String(currentSettings.spacing || 0) + 'px');
   root.style.setProperty('--va-leading', String(currentSettings.leading || 1.5));
@@ -117,6 +123,7 @@ function setupStyleBlock() {
 
   if (!currentSettings.isActive) {
     styleEl.textContent = '';
+    document.documentElement.style.removeProperty('--va-font-size-scale');
     document.documentElement.classList.remove('va-active', 'va-contrast-active', 'va-font-color-active');
     updateRuler(false);
     updateOverlay(0);
@@ -152,6 +159,27 @@ function setupStyleBlock() {
   const leadingRule = currentSettings.leading
     ? `line-height: ${currentSettings.leading} !important;`
     : '';
+
+  const fontSizeScale = (currentSettings.fontSize && currentSettings.fontSize !== 100)
+    ? (currentSettings.fontSize / 100)
+    : 1;
+
+  let fontSizeRules = '';
+  if (fontSizeScale !== 1) {
+    fontSizeRules = `
+      /* Proportional non-compounding font scaling */
+      html.va-active {
+        font-size: calc(100% * var(--va-font-size-scale, 1)) !important;
+      }
+      html.va-active :is(p, li, dt, dd, blockquote, figcaption):not([class*="badge"]):not([class*="chip"]):not([class*="icon"]):not(#va-action-badge *):not(#va-dict-modal *) {
+        font-size: calc(1.05rem * var(--va-font-size-scale, 1)) !important;
+      }
+      html.va-active h1 { font-size: calc(2.0rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active h2 { font-size: calc(1.6rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active h3 { font-size: calc(1.3rem * var(--va-font-size-scale, 1)) !important; }
+      html.va-active h4 { font-size: calc(1.15rem * var(--va-font-size-scale, 1)) !important; }
+    `;
+  }
 
   // Irlen Color Contrast & Background Handling
   let contrastRules = '';
@@ -256,6 +284,9 @@ function setupStyleBlock() {
       margin-bottom: var(--va-paragraph-spacing, 0px) !important;
       text-align: var(--va-text-align, inherit) !important;
     }
+
+    /* Font Size Rules */
+    ${fontSizeRules}
 
     /* Headings line height and alignment */
     html.va-active h1,

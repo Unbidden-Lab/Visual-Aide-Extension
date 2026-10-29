@@ -606,12 +606,17 @@ function formatPdfTextToParagraphs(items) {
 // -------------------------------------------------------------
 function displayExtractedPages(docTitle) {
   if (docTitle) currentDocumentTitle = docTitle;
-  document.getElementById('upload-hero').classList.add('hidden');
+  const uploadHero = document.getElementById('upload-hero');
+  if (uploadHero) {
+    uploadHero.classList.add('hidden');
+    uploadHero.style.display = 'none';
+  }
   hideReaderLoading();
 
   const docContainer = document.getElementById('reader-document');
   docContainer.innerHTML = '';
   docContainer.classList.remove('hidden');
+  docContainer.style.display = 'block';
 
   const totalPages = currentTotalPages || (currentLoadedPages && currentLoadedPages.length) || 1;
   if (currentReaderPageIndex > totalPages) currentReaderPageIndex = totalPages;
@@ -682,11 +687,18 @@ async function goToPreviousPage() {
   if (currentReaderPageIndex > 1) {
     handleTtsStop();
     currentReaderPageIndex--;
-    showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
-    await extractPageData(currentReaderPageIndex);
-    hideReaderLoading();
+    if (!currentLoadedPages[currentReaderPageIndex - 1]) {
+      showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
+      await extractPageData(currentReaderPageIndex);
+      hideReaderLoading();
+    }
     displayExtractedPages(currentDocumentTitle);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const docContainer = document.getElementById('reader-document');
+    if (docContainer) {
+      docContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 }
 
@@ -694,11 +706,18 @@ async function goToNextPage() {
   if (currentReaderPageIndex < currentTotalPages) {
     handleTtsStop();
     currentReaderPageIndex++;
-    showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
-    await extractPageData(currentReaderPageIndex);
-    hideReaderLoading();
+    if (!currentLoadedPages[currentReaderPageIndex - 1]) {
+      showReaderLoading(`Loading Page ${currentReaderPageIndex} of ${currentTotalPages}...`);
+      await extractPageData(currentReaderPageIndex);
+      hideReaderLoading();
+    }
     displayExtractedPages(currentDocumentTitle);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const docContainer = document.getElementById('reader-document');
+    if (docContainer) {
+      docContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 }
 

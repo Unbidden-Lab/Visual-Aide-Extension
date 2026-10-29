@@ -319,6 +319,10 @@ input[type=range] {
   align-items: center;
   padding: 40px 10px;
 }
+.upload-hero.hidden,
+.hidden {
+  display: none !important;
+}
 .drop-card {
   background: var(--reader-surface);
   border: 2px dashed #bbb;
