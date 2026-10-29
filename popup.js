@@ -331,4 +331,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+
+  // -------------------------------------------------------------
+  // On-Demand Hover Info Tooltips
+  // -------------------------------------------------------------
+  function initPopupTooltips() {
+    const tooltipEl = document.getElementById('popup-tooltip');
+    if (!tooltipEl) return;
+
+    let activeTarget = null;
+    let showTimer = null;
+
+    function showTooltip(target) {
+      if (!target) return;
+      const title = target.getAttribute('data-tooltip-title') || '';
+      const desc = target.getAttribute('data-tooltip-desc') || '';
+      if (!desc && !title) return;
+
+      activeTarget = target;
+      tooltipEl.innerHTML = `
+        ${title ? `<span class="popup-tooltip-title">${title}</span>` : ''}
+        ${desc ? `<span class="popup-tooltip-desc">${desc}</span>` : ''}
+      `;
+
+      const rect = target.getBoundingClientRect();
+      const tooltipWidth = 195;
+      let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+      let top = rect.bottom + 6;
+
+      // Clamp within popup window bounds
+      if (left < 10) left = 10;
+      if (left + tooltipWidth > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipWidth - 10;
+      }
+
+      // Flip above if near bottom edge
+      if (top + 60 > window.innerHeight) {
+        top = Math.max(10, rect.top - 55);
+      }
+
+      tooltipEl.style.left = `${Math.round(left)}px`;
+      tooltipEl.style.top = `${Math.round(top)}px`;
+      tooltipEl.classList.add('visible');
+      tooltipEl.setAttribute('aria-hidden', 'false');
+    }
+
+    function hideTooltip() {
+      activeTarget = null;
+      clearTimeout(showTimer);
+      tooltipEl.classList.remove('visible');
+      tooltipEl.setAttribute('aria-hidden', 'true');
+    }
+
+    document.addEventListener('mouseover', (e) => {
+      const target = e.target.closest('.info-help-btn');
+      if (target && target !== activeTarget) {
+        clearTimeout(showTimer);
+        showTimer = setTimeout(() => showTooltip(target), 80);
+      }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const target = e.target.closest('.info-help-btn');
+      if (target) {
+        const related = e.relatedTarget ? e.relatedTarget.closest('.info-help-btn') : null;
+        if (related !== target) {
+          hideTooltip();
+        }
+      }
+    });
+
+    document.addEventListener('focusin', (e) => {
+      const target = e.target.closest('.info-help-btn');
+      if (target) {
+        clearTimeout(showTimer);
+        showTooltip(target);
+      }
+    });
+
+    document.addEventListener('focusout', (e) => {
+      const target = e.target.closest('.info-help-btn');
+      if (target) {
+        hideTooltip();
+      }
+    });
+
+    // Prevent button click from toggling parent label or causing side effects
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.info-help-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    window.addEventListener('scroll', hideTooltip, { passive: true });
+  }
+
+  initPopupTooltips();
 });
