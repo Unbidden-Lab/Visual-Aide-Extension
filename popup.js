@@ -237,10 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const fontColorSelect = document.getElementById('font-color');
   const contrastModeSelect = document.getElementById('contrast-mode');
   const customContrastCard = document.getElementById('custom-contrast-card');
-  const customFontColorInput = document.getElementById('custom-font-color');
-  const customFontHexInput = document.getElementById('custom-font-hex');
-  const customBgColorInput = document.getElementById('custom-bg-color');
-  const customBgHexInput = document.getElementById('custom-bg-hex');
+  const customFontColorInput = document.getElementById('customTextColor') || document.getElementById('custom-font-color');
+  const customFontHexInput = document.getElementById('customTextHex') || document.getElementById('custom-font-hex');
+  const customBgColorInput = document.getElementById('customBgColor') || document.getElementById('custom-bg-color');
+  const customBgHexInput = document.getElementById('customBgHex') || document.getElementById('custom-bg-hex');
   const wcagRatioVal = document.getElementById('wcag-ratio-val');
   const wcagGradeBadge = document.getElementById('wcag-grade-badge');
   const contrastSamplePreview = document.getElementById('contrast-sample-preview');
@@ -316,6 +316,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ttsEngineTierSelect) ttsEngineTierSelect.value = syncTier;
         previousTier = syncTier;
         previousVoice = currentSettings.ttsVoice || 'female';
+        lastSyncedVoice = currentSettings.ttsVoice || 'female';
+        lastSyncedSpeed = currentSettings.ttsSpeed || 1.0;
+        lastSyncedTier = currentSettings.ttsEngineTier || 'wasm';
         updateNeuralTierVisibility(currentSettings.ttsVoice);
         checkGpuAdmissionAndInfo();
       });
@@ -445,8 +448,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Custom Color Contrast Chooser Listeners
+  // Live Visual Preview & Debounced Storage Helpers
+  function sendLivePreviewStyles(settings) {
+    const toPreview = { ...settings, tts: true, dictionary: true };
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'update_styles', settings: toPreview }).catch(() => {});
+      }
+    });
+  }
+
+  let colorSaveDebounceTimer = null;
+  function debouncedSaveCustomColors(delay = 400) {
+    if (colorSaveDebounceTimer) clearTimeout(colorSaveDebounceTimer);
+    colorSaveDebounceTimer = setTimeout(() => {
+      saveAndApply(currentSettings);
+    }, delay);
+  }
+
+  // Custom Color Contrast Chooser Listeners (Decoupled Live Preview & Storage Writes)
   if (customFontColorInput) {
+    // 1. Live visual updates on input: update WCAG ratio, preview box, and active tab without storage writes
     customFontColorInput.addEventListener('input', (e) => {
       const val = e.target.value;
       currentSettings.customFontColor = val;
@@ -457,6 +479,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (customFontHexInput) customFontHexInput.value = val.toUpperCase();
       updateCustomContrastUI(currentSettings);
       updateLevelButtons(0);
+      sendLivePreviewStyles(currentSettings);
+      debouncedSaveCustomColors(400);
+    });
+
+    // 2. Commit settings to chrome.storage.local on change (dialog release/close)
+    customFontColorInput.addEventListener('change', () => {
+      if (colorSaveDebounceTimer) clearTimeout(colorSaveDebounceTimer);
       saveAndApply(currentSettings);
     });
   }
@@ -473,6 +502,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (customFontColorInput) customFontColorInput.value = validHex;
         updateCustomContrastUI(currentSettings);
         updateLevelButtons(0);
+        sendLivePreviewStyles(currentSettings);
+        debouncedSaveCustomColors(400);
+      }
+    });
+
+    customFontHexInput.addEventListener('change', () => {
+      const validHex = normalizeHex(customFontHexInput.value);
+      if (validHex) {
+        currentSettings.customFontColor = validHex;
+        if (colorSaveDebounceTimer) clearTimeout(colorSaveDebounceTimer);
         saveAndApply(currentSettings);
       }
     });
@@ -485,6 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (customBgColorInput) {
+    // 1. Live visual updates on input: update WCAG ratio, preview box, and active tab without storage writes
     customBgColorInput.addEventListener('input', (e) => {
       const val = e.target.value;
       currentSettings.customBgColor = val;
@@ -495,6 +535,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (customBgHexInput) customBgHexInput.value = val.toUpperCase();
       updateCustomContrastUI(currentSettings);
       updateLevelButtons(0);
+      sendLivePreviewStyles(currentSettings);
+      debouncedSaveCustomColors(400);
+    });
+
+    // 2. Commit settings to chrome.storage.local on change (dialog release/close)
+    customBgColorInput.addEventListener('change', () => {
+      if (colorSaveDebounceTimer) clearTimeout(colorSaveDebounceTimer);
       saveAndApply(currentSettings);
     });
   }
@@ -511,6 +558,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (customBgColorInput) customBgColorInput.value = validHex;
         updateCustomContrastUI(currentSettings);
         updateLevelButtons(0);
+        sendLivePreviewStyles(currentSettings);
+        debouncedSaveCustomColors(400);
+      }
+    });
+
+    customBgHexInput.addEventListener('change', () => {
+      const validHex = normalizeHex(customBgHexInput.value);
+      if (validHex) {
+        currentSettings.customBgColor = validHex;
+        if (colorSaveDebounceTimer) clearTimeout(colorSaveDebounceTimer);
         saveAndApply(currentSettings);
       }
     });
@@ -1160,6 +1217,10 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCustomContrastUI(settings);
   }
 
+  let lastSyncedVoice = null;
+  let lastSyncedSpeed = null;
+  let lastSyncedTier = null;
+
   function saveAndApply(settings) {
     const toSave = { ...settings, tts: true, dictionary: true };
     if (toSave.readerFontSize !== undefined) {
@@ -1174,28 +1235,49 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       localStorage.setItem('va_settings', JSON.stringify(toSave));
     } catch (e) {}
-    chrome.storage.local.set({ va_settings: toSave }, () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'update_styles', settings: toSave }).catch(() => {});
+
+    // Persist user custom colors and all settings in chrome.storage.local (no quota rate limits)
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ va_settings: toSave }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          console.warn('Local storage warning:', chrome.runtime.lastError.message);
         }
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'update_styles', settings: toSave }).catch(() => {});
+          }
+        });
       });
-    });
-    // Persist voice and speed selection to sync storage
+    }
+
+    // Persist voice, speed, and tier to chrome.storage.sync ONLY when they actually change
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
       const syncObj = {};
-      if (toSave.ttsVoice) {
+      let hasSyncChanges = false;
+      if (toSave.ttsVoice && toSave.ttsVoice !== lastSyncedVoice) {
         syncObj.ttsVoice = toSave.ttsVoice;
         syncObj.ttsVoiceGender = toSave.ttsVoice;
+        lastSyncedVoice = toSave.ttsVoice;
+        hasSyncChanges = true;
       }
-      if (toSave.ttsSpeed !== undefined) {
+      if (toSave.ttsSpeed !== undefined && toSave.ttsSpeed !== lastSyncedSpeed) {
         syncObj.ttsSpeed = toSave.ttsSpeed;
         syncObj.ttsRate = toSave.ttsSpeed;
+        lastSyncedSpeed = toSave.ttsSpeed;
+        hasSyncChanges = true;
       }
-      if (toSave.ttsEngineTier) {
+      if (toSave.ttsEngineTier && toSave.ttsEngineTier !== lastSyncedTier) {
         syncObj.ttsEngineTier = toSave.ttsEngineTier;
+        lastSyncedTier = toSave.ttsEngineTier;
+        hasSyncChanges = true;
       }
-      chrome.storage.sync.set(syncObj);
+      if (hasSyncChanges) {
+        chrome.storage.sync.set(syncObj, () => {
+          if (chrome.runtime && chrome.runtime.lastError) {
+            console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+          }
+        });
+      }
     }
   }
 
