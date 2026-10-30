@@ -1203,6 +1203,1510 @@ const SIMPLIFIED_OFFLINE_DB = {
 /**
  * Generate stem variations so inflected words match their base dictionary entries
  */
+
+const COMMON_OFFLINE_ANTONYMS = {
+  "happy": [
+    "sad",
+    "unhappy",
+    "sorrowful",
+    "depressed"
+  ],
+  "sad": [
+    "happy",
+    "cheerful",
+    "glad",
+    "joyful"
+  ],
+  "good": [
+    "bad",
+    "poor",
+    "evil",
+    "wicked"
+  ],
+  "bad": [
+    "good",
+    "great",
+    "excellent",
+    "fine"
+  ],
+  "fast": [
+    "slow",
+    "sluggish",
+    "unhurried"
+  ],
+  "slow": [
+    "fast",
+    "quick",
+    "rapid",
+    "swift"
+  ],
+  "difficult": [
+    "easy",
+    "simple",
+    "effortless"
+  ],
+  "easy": [
+    "difficult",
+    "hard",
+    "tough",
+    "challenging"
+  ],
+  "hard": [
+    "soft",
+    "easy",
+    "flexible"
+  ],
+  "soft": [
+    "hard",
+    "firm",
+    "stiff"
+  ],
+  "large": [
+    "small",
+    "little",
+    "tiny"
+  ],
+  "small": [
+    "large",
+    "big",
+    "huge",
+    "giant"
+  ],
+  "big": [
+    "small",
+    "little",
+    "tiny",
+    "miniature"
+  ],
+  "hot": [
+    "cold",
+    "cool",
+    "chilly",
+    "freezing"
+  ],
+  "cold": [
+    "hot",
+    "warm",
+    "heated"
+  ],
+  "dark": [
+    "light",
+    "bright",
+    "clear"
+  ],
+  "light": [
+    "dark",
+    "heavy",
+    "dim"
+  ],
+  "heavy": [
+    "light",
+    "weightless"
+  ],
+  "strong": [
+    "weak",
+    "frail",
+    "feeble"
+  ],
+  "weak": [
+    "strong",
+    "powerful",
+    "robust"
+  ],
+  "rich": [
+    "poor",
+    "needy",
+    "destitute"
+  ],
+  "poor": [
+    "rich",
+    "wealthy",
+    "prosperous"
+  ],
+  "clean": [
+    "dirty",
+    "filthy",
+    "messy"
+  ],
+  "dirty": [
+    "clean",
+    "pure",
+    "spotless"
+  ],
+  "clear": [
+    "unclear",
+    "vague",
+    "cloudy",
+    "blurry"
+  ],
+  "safe": [
+    "dangerous",
+    "risky",
+    "unsafe"
+  ],
+  "dangerous": [
+    "safe",
+    "secure"
+  ],
+  "true": [
+    "false",
+    "untrue",
+    "fake"
+  ],
+  "false": [
+    "true",
+    "accurate",
+    "real"
+  ],
+  "right": [
+    "wrong",
+    "incorrect",
+    "left"
+  ],
+  "wrong": [
+    "right",
+    "correct",
+    "true"
+  ],
+  "early": [
+    "late",
+    "delayed"
+  ],
+  "late": [
+    "early",
+    "punctual"
+  ],
+  "near": [
+    "far",
+    "distant",
+    "remote"
+  ],
+  "far": [
+    "near",
+    "close",
+    "nearby"
+  ],
+  "open": [
+    "closed",
+    "shut"
+  ],
+  "closed": [
+    "open",
+    "unlocked"
+  ],
+  "full": [
+    "empty",
+    "vacant"
+  ],
+  "empty": [
+    "full",
+    "crowded"
+  ],
+  "bright": [
+    "dim",
+    "dark",
+    "dull"
+  ],
+  "dim": [
+    "bright",
+    "luminous",
+    "clear"
+  ],
+  "loud": [
+    "quiet",
+    "silent",
+    "soft"
+  ],
+  "quiet": [
+    "loud",
+    "noisy",
+    "boisterous"
+  ],
+  "deep": [
+    "shallow",
+    "superficial"
+  ],
+  "shallow": [
+    "deep",
+    "profound"
+  ],
+  "dry": [
+    "wet",
+    "damp",
+    "moist"
+  ],
+  "wet": [
+    "dry",
+    "dehydrated"
+  ],
+  "active": [
+    "inactive",
+    "passive",
+    "idle"
+  ],
+  "passive": [
+    "active",
+    "dynamic"
+  ],
+  "calm": [
+    "anxious",
+    "agitated",
+    "nervous",
+    "stormy"
+  ],
+  "brave": [
+    "cowardly",
+    "fearful",
+    "timid"
+  ],
+  "cowardly": [
+    "brave",
+    "courageous",
+    "bold"
+  ],
+  "sharp": [
+    "dull",
+    "blunt"
+  ],
+  "dull": [
+    "sharp",
+    "bright",
+    "interesting"
+  ],
+  "smooth": [
+    "rough",
+    "bumpy",
+    "coarse"
+  ],
+  "rough": [
+    "smooth",
+    "gentle",
+    "even"
+  ],
+  "sweet": [
+    "sour",
+    "bitter",
+    "salty"
+  ],
+  "bitter": [
+    "sweet",
+    "pleasant"
+  ],
+  "thick": [
+    "thin",
+    "slender",
+    "lean"
+  ],
+  "thin": [
+    "thick",
+    "wide",
+    "fat"
+  ],
+  "wide": [
+    "narrow",
+    "tight",
+    "thin"
+  ],
+  "narrow": [
+    "wide",
+    "broad"
+  ],
+  "alive": [
+    "dead",
+    "deceased"
+  ],
+  "dead": [
+    "alive",
+    "living"
+  ],
+  "begin": [
+    "end",
+    "finish",
+    "stop"
+  ],
+  "end": [
+    "begin",
+    "start"
+  ],
+  "create": [
+    "destroy",
+    "demolish",
+    "ruin"
+  ],
+  "destroy": [
+    "create",
+    "build",
+    "construct"
+  ],
+  "gain": [
+    "lose",
+    "loss",
+    "decrease"
+  ],
+  "lose": [
+    "win",
+    "find",
+    "gain"
+  ],
+  "give": [
+    "take",
+    "receive",
+    "keep"
+  ],
+  "take": [
+    "give",
+    "offer",
+    "return"
+  ],
+  "increase": [
+    "decrease",
+    "reduce",
+    "diminish"
+  ],
+  "decrease": [
+    "increase",
+    "expand",
+    "boost"
+  ],
+  "love": [
+    "hate",
+    "loathe",
+    "dislike"
+  ],
+  "hate": [
+    "love",
+    "like",
+    "adore"
+  ],
+  "peace": [
+    "war",
+    "conflict",
+    "turmoil"
+  ],
+  "war": [
+    "peace",
+    "harmony"
+  ],
+  "raise": [
+    "lower",
+    "drop"
+  ],
+  "lower": [
+    "raise",
+    "elevate"
+  ],
+  "remember": [
+    "forget",
+    "overlook"
+  ],
+  "forget": [
+    "remember",
+    "recall"
+  ],
+  "rise": [
+    "fall",
+    "sink",
+    "descend"
+  ],
+  "fall": [
+    "rise",
+    "climb"
+  ],
+  "win": [
+    "lose",
+    "fail"
+  ],
+  "accept": [
+    "reject",
+    "refuse",
+    "decline"
+  ],
+  "reject": [
+    "accept",
+    "approve"
+  ],
+  "allow": [
+    "forbid",
+    "prohibit",
+    "disallow"
+  ],
+  "forbid": [
+    "allow",
+    "permit"
+  ],
+  "appear": [
+    "disappear",
+    "vanish"
+  ],
+  "disappear": [
+    "appear",
+    "materialize"
+  ],
+  "arrive": [
+    "depart",
+    "leave"
+  ],
+  "depart": [
+    "arrive",
+    "stay"
+  ],
+  "build": [
+    "destroy",
+    "demolish"
+  ],
+  "buy": [
+    "sell"
+  ],
+  "sell": [
+    "buy",
+    "purchase"
+  ],
+  "catch": [
+    "miss",
+    "release",
+    "drop"
+  ],
+  "connect": [
+    "disconnect",
+    "separate"
+  ],
+  "expand": [
+    "shrink",
+    "contract"
+  ],
+  "shrink": [
+    "expand",
+    "grow"
+  ],
+  "fail": [
+    "succeed",
+    "pass"
+  ],
+  "succeed": [
+    "fail",
+    "falter"
+  ],
+  "find": [
+    "lose",
+    "misplace"
+  ],
+  "freeze": [
+    "melt",
+    "thaw"
+  ],
+  "melt": [
+    "freeze",
+    "solidify"
+  ],
+  "gather": [
+    "scatter",
+    "disperse"
+  ],
+  "hide": [
+    "reveal",
+    "show",
+    "display"
+  ],
+  "reveal": [
+    "hide",
+    "conceal"
+  ],
+  "join": [
+    "separate",
+    "leave",
+    "detach"
+  ],
+  "pull": [
+    "push"
+  ],
+  "push": [
+    "pull"
+  ],
+  "teach": [
+    "learn"
+  ],
+  "learn": [
+    "teach"
+  ],
+  "temporary": [
+    "permanent",
+    "lasting",
+    "constant"
+  ],
+  "permanent": [
+    "temporary",
+    "fleeting"
+  ],
+  "visible": [
+    "invisible",
+    "hidden",
+    "unseen"
+  ],
+  "invisible": [
+    "visible",
+    "clear"
+  ],
+  "willing": [
+    "unwilling",
+    "reluctant"
+  ],
+  "wise": [
+    "foolish",
+    "unwise",
+    "silly"
+  ],
+  "foolish": [
+    "wise",
+    "sensible",
+    "prudent"
+  ],
+  "young": [
+    "old",
+    "elderly",
+    "aged"
+  ],
+  "old": [
+    "young",
+    "new",
+    "fresh"
+  ],
+  "ancient": [
+    "modern",
+    "new",
+    "recent",
+    "contemporary"
+  ],
+  "modern": [
+    "ancient",
+    "archaic",
+    "traditional",
+    "historic"
+  ],
+  "complex": [
+    "simple",
+    "basic",
+    "uncomplicated",
+    "elementary"
+  ],
+  "simple": [
+    "complex",
+    "complicated",
+    "intricate",
+    "difficult"
+  ],
+  "huge": [
+    "tiny",
+    "small",
+    "miniature",
+    "minute"
+  ],
+  "giant": [
+    "dwarf",
+    "tiny",
+    "miniature",
+    "petite"
+  ],
+  "tiny": [
+    "huge",
+    "giant",
+    "enormous",
+    "massive"
+  ],
+  "massive": [
+    "tiny",
+    "slight",
+    "flimsy",
+    "delicate"
+  ],
+  "cheap": [
+    "expensive",
+    "costly",
+    "valuable",
+    "pricey"
+  ],
+  "expensive": [
+    "cheap",
+    "inexpensive",
+    "affordable",
+    "low-cost"
+  ],
+  "healthy": [
+    "sick",
+    "ill",
+    "unhealthy",
+    "diseased"
+  ],
+  "sick": [
+    "healthy",
+    "well",
+    "fit",
+    "sound"
+  ],
+  "polite": [
+    "rude",
+    "impolite",
+    "discourteous",
+    "insolent"
+  ],
+  "rude": [
+    "polite",
+    "courteous",
+    "respectful",
+    "civil"
+  ],
+  "generous": [
+    "stingy",
+    "selfish",
+    "greedy",
+    "miserly"
+  ],
+  "stingy": [
+    "generous",
+    "charitable",
+    "bountiful",
+    "giving"
+  ],
+  "patient": [
+    "impatient",
+    "restless",
+    "agitated",
+    "intolerant"
+  ],
+  "impatient": [
+    "patient",
+    "calm",
+    "tolerant",
+    "forbearing"
+  ],
+  "friendly": [
+    "hostile",
+    "unfriendly",
+    "cold",
+    "antagonistic"
+  ],
+  "hostile": [
+    "friendly",
+    "welcoming",
+    "peaceful",
+    "cordial"
+  ],
+  "kind": [
+    "cruel",
+    "mean",
+    "harsh",
+    "unkind"
+  ],
+  "cruel": [
+    "kind",
+    "gentle",
+    "merciful",
+    "compassionate"
+  ],
+  "honest": [
+    "dishonest",
+    "deceitful",
+    "corrupt",
+    "untruthful"
+  ],
+  "dishonest": [
+    "honest",
+    "truthful",
+    "sincere",
+    "trustworthy"
+  ],
+  "careful": [
+    "careless",
+    "reckless",
+    "negligent",
+    "heedless"
+  ],
+  "careless": [
+    "careful",
+    "cautious",
+    "thorough",
+    "attentive"
+  ],
+  "cautious": [
+    "reckless",
+    "rash",
+    "bold",
+    "careless"
+  ],
+  "reckless": [
+    "cautious",
+    "prudent",
+    "careful",
+    "wary"
+  ],
+  "anxious": [
+    "calm",
+    "relaxed",
+    "peaceful",
+    "serene"
+  ],
+  "rare": [
+    "common",
+    "frequent",
+    "ordinary",
+    "usual"
+  ],
+  "common": [
+    "rare",
+    "uncommon",
+    "unusual",
+    "unique"
+  ],
+  "unique": [
+    "common",
+    "ordinary",
+    "standard",
+    "generic"
+  ],
+  "normal": [
+    "abnormal",
+    "strange",
+    "unusual",
+    "odd"
+  ],
+  "strange": [
+    "normal",
+    "familiar",
+    "ordinary",
+    "typical"
+  ],
+  "familiar": [
+    "unfamiliar",
+    "unknown",
+    "strange",
+    "foreign"
+  ],
+  "foreign": [
+    "native",
+    "local",
+    "domestic",
+    "familiar"
+  ],
+  "native": [
+    "foreign",
+    "alien",
+    "imported",
+    "external"
+  ],
+  "public": [
+    "private",
+    "secret",
+    "personal",
+    "confidential"
+  ],
+  "private": [
+    "public",
+    "open",
+    "communal",
+    "shared"
+  ],
+  "major": [
+    "minor",
+    "secondary",
+    "insignificant",
+    "slight"
+  ],
+  "minor": [
+    "major",
+    "significant",
+    "vital",
+    "primary"
+  ],
+  "maximum": [
+    "minimum",
+    "least",
+    "lowest"
+  ],
+  "minimum": [
+    "maximum",
+    "most",
+    "highest"
+  ],
+  "superior": [
+    "inferior",
+    "poorer",
+    "lower",
+    "subordinate"
+  ],
+  "inferior": [
+    "superior",
+    "better",
+    "higher",
+    "greater"
+  ],
+  "senior": [
+    "junior",
+    "younger",
+    "subordinate"
+  ],
+  "junior": [
+    "senior",
+    "elder",
+    "superior"
+  ],
+  "noisy": [
+    "quiet",
+    "silent",
+    "calm",
+    "peaceful"
+  ],
+  "blunt": [
+    "sharp",
+    "pointed",
+    "keen"
+  ],
+  "tight": [
+    "loose",
+    "slack",
+    "baggy"
+  ],
+  "loose": [
+    "tight",
+    "firm",
+    "secure"
+  ],
+  "sour": [
+    "sweet",
+    "sugary",
+    "pleasant"
+  ],
+  "fresh": [
+    "stale",
+    "rotten",
+    "spoiled",
+    "old"
+  ],
+  "stale": [
+    "fresh",
+    "new",
+    "crisp"
+  ],
+  "pure": [
+    "impure",
+    "contaminated",
+    "polluted"
+  ],
+  "polluted": [
+    "pure",
+    "clean",
+    "fresh",
+    "uncontaminated"
+  ],
+  "correct": [
+    "incorrect",
+    "wrong",
+    "false",
+    "flawed"
+  ],
+  "incorrect": [
+    "correct",
+    "right",
+    "accurate",
+    "exact"
+  ],
+  "high": [
+    "low",
+    "short",
+    "deep"
+  ],
+  "low": [
+    "high",
+    "tall",
+    "elevated"
+  ],
+  "tall": [
+    "short",
+    "low",
+    "petite"
+  ],
+  "short": [
+    "tall",
+    "long",
+    "extended"
+  ],
+  "long": [
+    "short",
+    "brief",
+    "curtailed"
+  ],
+  "smart": [
+    "stupid",
+    "foolish",
+    "slow",
+    "unintelligent"
+  ],
+  "stupid": [
+    "smart",
+    "clever",
+    "intelligent",
+    "bright"
+  ],
+  "clever": [
+    "foolish",
+    "clumsy",
+    "naive",
+    "simple"
+  ],
+  "awake": [
+    "asleep",
+    "sleeping",
+    "drowsy"
+  ],
+  "asleep": [
+    "awake",
+    "alert",
+    "conscious"
+  ],
+  "proud": [
+    "humble",
+    "modest",
+    "ashamed"
+  ],
+  "humble": [
+    "proud",
+    "arrogant",
+    "boastful"
+  ],
+  "arrogant": [
+    "humble",
+    "modest",
+    "courteous"
+  ],
+  "modest": [
+    "arrogant",
+    "boastful",
+    "immodest"
+  ],
+  "funny": [
+    "serious",
+    "somber",
+    "grave",
+    "solemn"
+  ],
+  "serious": [
+    "funny",
+    "playful",
+    "lighthearted",
+    "silly"
+  ],
+  "angry": [
+    "calm",
+    "peaceful",
+    "pleased",
+    "content"
+  ],
+  "excited": [
+    "bored",
+    "calm",
+    "indifferent"
+  ],
+  "bored": [
+    "excited",
+    "interested",
+    "enthusiastic"
+  ],
+  "straight": [
+    "crooked",
+    "curved",
+    "bent",
+    "twisted"
+  ],
+  "crooked": [
+    "straight",
+    "direct",
+    "honest",
+    "level"
+  ],
+  "broad": [
+    "narrow",
+    "tight",
+    "restricted"
+  ],
+  "fat": [
+    "thin",
+    "skinny",
+    "lean",
+    "slender"
+  ],
+  "skinny": [
+    "fat",
+    "chubby",
+    "plump",
+    "heavy"
+  ],
+  "warm": [
+    "cool",
+    "chilly",
+    "cold"
+  ],
+  "cool": [
+    "warm",
+    "heated",
+    "hot"
+  ],
+  "sunny": [
+    "cloudy",
+    "rainy",
+    "gloomy",
+    "overcast"
+  ],
+  "cloudy": [
+    "sunny",
+    "clear",
+    "bright"
+  ],
+  "equal": [
+    "unequal",
+    "different",
+    "disparate"
+  ],
+  "unequal": [
+    "equal",
+    "identical",
+    "even"
+  ],
+  "similar": [
+    "different",
+    "dissimilar",
+    "distinct"
+  ],
+  "different": [
+    "similar",
+    "same",
+    "identical",
+    "alike"
+  ],
+  "same": [
+    "different",
+    "distinct",
+    "other"
+  ],
+  "start": [
+    "stop",
+    "finish",
+    "halt",
+    "conclude"
+  ],
+  "stop": [
+    "start",
+    "continue",
+    "resume",
+    "proceed"
+  ],
+  "receive": [
+    "give",
+    "send",
+    "deliver",
+    "reject"
+  ],
+  "send": [
+    "receive",
+    "keep",
+    "retain",
+    "fetch"
+  ],
+  "grow": [
+    "shrink",
+    "wither",
+    "diminish",
+    "decline"
+  ],
+  "ascend": [
+    "descend",
+    "fall",
+    "sink"
+  ],
+  "descend": [
+    "ascend",
+    "climb",
+    "scale"
+  ],
+  "throw": [
+    "catch",
+    "hold",
+    "keep"
+  ],
+  "show": [
+    "hide",
+    "conceal",
+    "veil"
+  ],
+  "like": [
+    "dislike",
+    "hate",
+    "resent"
+  ],
+  "dislike": [
+    "like",
+    "enjoy",
+    "love"
+  ],
+  "agree": [
+    "disagree",
+    "dissent",
+    "oppose",
+    "argue"
+  ],
+  "disagree": [
+    "agree",
+    "concur",
+    "consent",
+    "harmonize"
+  ],
+  "admit": [
+    "deny",
+    "conceal",
+    "hide",
+    "reject"
+  ],
+  "deny": [
+    "admit",
+    "confirm",
+    "acknowledge",
+    "concede"
+  ],
+  "praise": [
+    "criticize",
+    "blame",
+    "scold",
+    "condemn"
+  ],
+  "criticize": [
+    "praise",
+    "applaud",
+    "compliment",
+    "commend"
+  ],
+  "reward": [
+    "punish",
+    "penalize",
+    "fine"
+  ],
+  "punish": [
+    "reward",
+    "pardon",
+    "forgive",
+    "excuse"
+  ],
+  "encourage": [
+    "discourage",
+    "dissuade",
+    "deter"
+  ],
+  "discourage": [
+    "encourage",
+    "inspire",
+    "embolden"
+  ],
+  "include": [
+    "exclude",
+    "omit",
+    "remove",
+    "ignore"
+  ],
+  "exclude": [
+    "include",
+    "incorporate",
+    "welcome",
+    "contain"
+  ],
+  "enter": [
+    "exit",
+    "leave",
+    "depart"
+  ],
+  "exit": [
+    "enter",
+    "arrive",
+    "stay"
+  ],
+  "lock": [
+    "unlock",
+    "open",
+    "release"
+  ],
+  "unlock": [
+    "lock",
+    "fasten",
+    "secure"
+  ],
+  "live": [
+    "die",
+    "perish",
+    "expire"
+  ],
+  "die": [
+    "live",
+    "survive",
+    "resurrect"
+  ],
+  "sink": [
+    "float",
+    "rise",
+    "soar"
+  ],
+  "float": [
+    "sink",
+    "submerge",
+    "dive"
+  ],
+  "shout": [
+    "whisper",
+    "murmur",
+    "mutter"
+  ],
+  "whisper": [
+    "shout",
+    "scream",
+    "yell"
+  ],
+  "laugh": [
+    "cry",
+    "weep",
+    "sob",
+    "mourn"
+  ],
+  "cry": [
+    "laugh",
+    "smile",
+    "cheer"
+  ],
+  "smile": [
+    "frown",
+    "scowl",
+    "glare"
+  ],
+  "frown": [
+    "smile",
+    "grin",
+    "beam"
+  ],
+  "trust": [
+    "doubt",
+    "distrust",
+    "suspect"
+  ],
+  "doubt": [
+    "trust",
+    "believe",
+    "credit"
+  ],
+  "advance": [
+    "retreat",
+    "recede",
+    "withdraw"
+  ],
+  "retreat": [
+    "advance",
+    "proceed",
+    "charge"
+  ],
+  "construct": [
+    "demolish",
+    "destroy",
+    "wreck"
+  ],
+  "demolish": [
+    "construct",
+    "build",
+    "create"
+  ],
+  "attract": [
+    "repel",
+    "repulse",
+    "deter"
+  ],
+  "repel": [
+    "attract",
+    "draw",
+    "invite"
+  ],
+  "unite": [
+    "divide",
+    "split",
+    "separate"
+  ],
+  "divide": [
+    "unite",
+    "join",
+    "combine"
+  ],
+  "friend": [
+    "enemy",
+    "foe",
+    "rival",
+    "opponent"
+  ],
+  "enemy": [
+    "friend",
+    "ally",
+    "companion",
+    "partner"
+  ],
+  "ally": [
+    "enemy",
+    "adversary",
+    "rival"
+  ],
+  "truth": [
+    "lie",
+    "falsehood",
+    "myth",
+    "fiction"
+  ],
+  "lie": [
+    "truth",
+    "fact",
+    "reality"
+  ],
+  "fact": [
+    "fiction",
+    "myth",
+    "lie",
+    "rumor"
+  ],
+  "fiction": [
+    "fact",
+    "nonfiction",
+    "truth",
+    "reality"
+  ],
+  "day": [
+    "night",
+    "darkness",
+    "dusk"
+  ],
+  "night": [
+    "day",
+    "daylight",
+    "dawn"
+  ],
+  "morning": [
+    "evening",
+    "night",
+    "dusk"
+  ],
+  "evening": [
+    "morning",
+    "dawn",
+    "daybreak"
+  ],
+  "sun": [
+    "moon",
+    "shadow"
+  ],
+  "moon": [
+    "sun",
+    "daylight"
+  ],
+  "heat": [
+    "cold",
+    "chill",
+    "frost"
+  ],
+  "warmth": [
+    "chill",
+    "cold",
+    "coolness"
+  ],
+  "summer": [
+    "winter"
+  ],
+  "winter": [
+    "summer"
+  ],
+  "birth": [
+    "death",
+    "demise",
+    "end"
+  ],
+  "death": [
+    "birth",
+    "life",
+    "creation"
+  ],
+  "life": [
+    "death",
+    "mortality",
+    "extinction"
+  ],
+  "beginning": [
+    "end",
+    "conclusion",
+    "finale"
+  ],
+  "success": [
+    "failure",
+    "defeat",
+    "loss"
+  ],
+  "failure": [
+    "success",
+    "triumph",
+    "achievement"
+  ],
+  "joy": [
+    "sorrow",
+    "grief",
+    "sadness",
+    "misery"
+  ],
+  "sorrow": [
+    "joy",
+    "happiness",
+    "delight",
+    "glee"
+  ],
+  "hope": [
+    "despair",
+    "hopelessness",
+    "pessimism"
+  ],
+  "despair": [
+    "hope",
+    "optimism",
+    "confidence"
+  ],
+  "strength": [
+    "weakness",
+    "frailty",
+    "feebleness"
+  ],
+  "weakness": [
+    "strength",
+    "power",
+    "vigor"
+  ],
+  "order": [
+    "chaos",
+    "disorder",
+    "turmoil",
+    "mess"
+  ],
+  "chaos": [
+    "order",
+    "peace",
+    "structure",
+    "system"
+  ],
+  "noise": [
+    "silence",
+    "quiet",
+    "stillness",
+    "calm"
+  ],
+  "silence": [
+    "noise",
+    "sound",
+    "clamor",
+    "racket"
+  ]
+};
+
 function getStemCandidates(word) {
   const candidates = [word];
   if (word.endsWith('ies') && word.length > 4) candidates.push(word.slice(0, -3) + 'y');
@@ -1397,11 +2901,25 @@ async function lookupSimplifiedWord(inputWord) {
   const clean = inputWord.toLowerCase().replace(/[^a-z0-9'-]/g, '').trim();
   if (!clean || clean.length < 2) return null;
 
-  // 1. Check offline curated dictionary with all stem variations
   const stems = getStemCandidates(clean);
+
+  // Helper to resolve antonyms from common offline list if empty
+  const resolveAntonyms = (existingAntonyms = [], synonyms = []) => {
+    if (existingAntonyms && existingAntonyms.length > 0) return existingAntonyms;
+    for (const s of [clean, ...stems, ...(synonyms || [])]) {
+      const lowerS = (s || '').toLowerCase();
+      if (COMMON_OFFLINE_ANTONYMS[lowerS]) {
+        return COMMON_OFFLINE_ANTONYMS[lowerS];
+      }
+    }
+    return [];
+  };
+
+  // 1. Check offline curated dictionary with all stem variations
   for (const stem of stems) {
     if (SIMPLIFIED_OFFLINE_DB[stem]) {
       const entry = SIMPLIFIED_OFFLINE_DB[stem];
+      const antonyms = resolveAntonyms(entry.antonyms, entry.synonyms);
       return {
         word: clean,
         rootWord: stem !== clean ? stem : '',
@@ -1409,7 +2927,7 @@ async function lookupSimplifiedWord(inputWord) {
         definition: entry.def,
         contextualDef: entry.context || '',
         synonyms: entry.synonyms || [],
-        antonyms: entry.antonyms || [],
+        antonyms,
         example: entry.example || '',
         source: 'offline',
         phonetic: ''
@@ -1418,42 +2936,66 @@ async function lookupSimplifiedWord(inputWord) {
   }
 
   // 2. Query online services if connected
-  if (typeof navigator !== 'undefined' && navigator.onLine) {
+  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+  if (isOnline) {
     // Try Datamuse first (fastest and most reliable)
     for (const wordToTry of [clean, ...stems.slice(1, 3)]) {
       const result = await fetchDatamuseDefinition(wordToTry);
-      if (result) return result;
+      if (result) {
+        result.antonyms = resolveAntonyms(result.antonyms, result.synonyms);
+        return result;
+      }
     }
 
     // Try secondary dictionary API
     const fallbackResult = await fetchFreeDictFallback(clean);
-    if (fallbackResult) return fallbackResult;
+    if (fallbackResult) {
+      fallbackResult.antonyms = resolveAntonyms(fallbackResult.antonyms, fallbackResult.synonyms);
+      return fallbackResult;
+    }
   }
 
-  // 3. Instant clean fallback if not found (never hangs!)
+  // 3. Check if word itself exists in common offline antonyms map even if definition is missing
+  const commonAnts = resolveAntonyms();
+  if (commonAnts.length > 0) {
+    return {
+      word: clean,
+      pos: 'word',
+      definition: `A widely used word representing ${clean}.`,
+      contextualDef: `In context: Commonly contrasted with its opposites: ${commonAnts.slice(0, 3).join(', ')}.`,
+      synonyms: [],
+      antonyms: commonAnts,
+      example: '',
+      source: 'offline'
+    };
+  }
+
+  // 4. Instant clean fallback if not found (never hangs!)
   return {
     word: clean,
     pos: 'term',
-    definition: (typeof navigator !== 'undefined' && navigator.onLine)
+    definition: isOnline
       ? `A simple definition for "${clean}" was not found. Try searching for its root form.`
       : `You are in Offline Mode and "${clean}" is not stored in the offline dictionary cache.`,
     contextualDef: '',
     synonyms: [],
     antonyms: [],
     example: '',
-    source: (typeof navigator !== 'undefined' && navigator.onLine) ? 'not_found' : 'offline_missing'
+    source: isOnline ? 'not_found' : 'offline_missing'
   };
 }
 
 // Universal export for service workers, window, and node
 if (typeof self !== 'undefined') {
   self.SIMPLIFIED_OFFLINE_DB = SIMPLIFIED_OFFLINE_DB;
+  self.COMMON_OFFLINE_ANTONYMS = COMMON_OFFLINE_ANTONYMS;
   self.lookupSimplifiedWord = lookupSimplifiedWord;
 }
 if (typeof window !== 'undefined') {
   window.SIMPLIFIED_OFFLINE_DB = SIMPLIFIED_OFFLINE_DB;
+  window.COMMON_OFFLINE_ANTONYMS = COMMON_OFFLINE_ANTONYMS;
   window.lookupSimplifiedWord = lookupSimplifiedWord;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SIMPLIFIED_OFFLINE_DB, lookupSimplifiedWord, getStemCandidates, cleanDefinitionText };
+  module.exports = { SIMPLIFIED_OFFLINE_DB, COMMON_OFFLINE_ANTONYMS, lookupSimplifiedWord, getStemCandidates, cleanDefinitionText };
 }

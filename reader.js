@@ -1465,16 +1465,24 @@ async function openDictionaryModal(word) {
       if (contextBlock) contextBlock.style.display = 'none';
     }
 
-    if (entry.synonyms && entry.synonyms.length > 0) {
+        if (entry.synonyms && entry.synonyms.length > 0) {
       synBlock.style.display = 'block';
-      synList.innerHTML = entry.synonyms.map(s => `<span class="synonym-chip">${s}</span>`).join('');
+      synList.innerHTML = entry.synonyms.map(s => `<span class="synonym-chip" title="Look up '${s}'">${s}</span>`).join('');
+      synList.querySelectorAll('.synonym-chip').forEach(chip => {
+        chip.addEventListener('click', () => openDictionaryModal(chip.textContent.trim()));
+      });
     } else {
       synBlock.style.display = 'none';
     }
 
     if (entry.antonyms && entry.antonyms.length > 0) {
       if (antBlock) antBlock.style.display = 'block';
-      if (antList) antList.innerHTML = entry.antonyms.map(a => `<span class="antonym-chip">${a}</span>`).join('');
+      if (antList) {
+        antList.innerHTML = entry.antonyms.map(a => `<span class="antonym-chip" title="Look up '${a}'">${a}</span>`).join('');
+        antList.querySelectorAll('.antonym-chip').forEach(chip => {
+          chip.addEventListener('click', () => openDictionaryModal(chip.textContent.trim()));
+        });
+      }
     } else {
       if (antBlock) antBlock.style.display = 'none';
     }

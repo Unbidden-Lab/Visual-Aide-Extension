@@ -689,6 +689,16 @@ function setupStyleBlock() {
       padding: 2px 7px;
       border-radius: 10px;
       font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .va-syn-chip:hover {
+      border-color: #00ffcc;
+      background: rgba(0, 255, 204, 0.15);
+    }
+    .va-ant-chip:hover {
+      border-color: #ff99aa;
+      background: rgba(255, 153, 170, 0.18);
     }
   `;
 
@@ -1506,6 +1516,14 @@ async function openInPageDictionary(word, x, y) {
     `;
 
     document.getElementById('va-dict-close').onclick = removeDictModal;
+    dictModal.querySelectorAll('.va-syn-chip, .va-ant-chip').forEach(chip => {
+      chip.style.cursor = 'pointer';
+      chip.title = `Look up '${chip.textContent.trim()}'`;
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        openInPageDictionary(chip.textContent.trim(), x, y);
+      };
+    });
     document.getElementById('va-word-speak').onclick = async () => {
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();

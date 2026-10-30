@@ -723,4 +723,153 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   initPopupTooltips();
+
+  // -----------------------------------------------------------
+  // Simplified Dictionary in Extension Popup
+  // -----------------------------------------------------------
+  function initPopupDictionary() {
+    const input = document.getElementById('popup-dict-input');
+    const searchBtn = document.getElementById('popup-dict-btn');
+    const resultBox = document.getElementById('popup-dict-result');
+    const wordEl = document.getElementById('popup-dict-word');
+    const posEl = document.getElementById('popup-dict-pos');
+    const sourceEl = document.getElementById('popup-dict-source');
+    const speakBtn = document.getElementById('popup-dict-speak-btn');
+    const defEl = document.getElementById('popup-dict-def');
+    const contextBox = document.getElementById('popup-dict-context-box');
+    const contextText = document.getElementById('popup-dict-context-text');
+    const synBox = document.getElementById('popup-dict-syn-box');
+    const synList = document.getElementById('popup-dict-syn-list');
+    const antBox = document.getElementById('popup-dict-ant-box');
+    const antList = document.getElementById('popup-dict-ant-list');
+
+    if (!input || !searchBtn || !resultBox) return;
+
+    let activeWord = '';
+
+    const executeLookup = async (targetWord) => {
+      const query = (targetWord || input.value || '').trim();
+      if (!query) return;
+
+      activeWord = query;
+      input.value = query;
+
+      resultBox.classList.remove('hidden');
+      wordEl.textContent = query;
+      posEl.textContent = '...';
+      sourceEl.textContent = 'searching';
+      defEl.textContent = 'Searching simplified definition...';
+      contextBox.style.display = 'none';
+      synBox.style.display = 'none';
+      antBox.style.display = 'none';
+
+      let entry = null;
+
+      // 1. Direct synchronous/async call to dictionary.js
+      if (typeof lookupSimplifiedWord === 'function') {
+        try {
+          entry = await lookupSimplifiedWord(query);
+        } catch (e) {
+          entry = null;
+        }
+      }
+
+      // 2. Fallback to background worker lookup
+      if (!entry && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        try {
+          entry = await new Promise((resolve) => {
+            const timer = setTimeout(() => resolve(null), 2500);
+            chrome.runtime.sendMessage({ action: 'lookup_word', word: query }, (resp) => {
+              clearTimeout(timer);
+              resolve(resp || null);
+            });
+          });
+        } catch (e) {
+          entry = null;
+        }
+      }
+
+      if (entry) {
+        activeWord = entry.word || query;
+        wordEl.textContent = entry.word || query;
+        posEl.textContent = entry.pos || 'term';
+        sourceEl.textContent = entry.source || 'dictionary';
+        defEl.textContent = entry.definition || 'No definition available.';
+
+        // Contextual definition
+        if (entry.contextualDef) {
+          contextBox.style.display = 'block';
+          contextText.textContent = entry.contextualDef;
+        } else {
+          contextBox.style.display = 'none';
+        }
+
+        // Simpler words (Synonyms)
+        if (entry.synonyms && entry.synonyms.length > 0) {
+          synBox.style.display = 'block';
+          synList.innerHTML = entry.synonyms.map(s => `<span class="dict-chip-syn" title="Look up '${s}'">${s}</span>`).join('');
+          synList.querySelectorAll('.dict-chip-syn').forEach(chip => {
+            chip.addEventListener('click', () => {
+              executeLookup(chip.textContent.trim());
+            });
+          });
+        } else {
+          synBox.style.display = 'none';
+        }
+
+        // Opposite words (Antonyms) - Shown whenever possible or available
+        if (entry.antonyms && entry.antonyms.length > 0) {
+          antBox.style.display = 'block';
+          antList.innerHTML = entry.antonyms.map(a => `<span class="dict-chip-ant" title="Look up '${a}'">${a}</span>`).join('');
+          antList.querySelectorAll('.dict-chip-ant').forEach(chip => {
+            chip.addEventListener('click', () => {
+              executeLookup(chip.textContent.trim());
+            });
+          });
+        } else {
+          antBox.style.display = 'none';
+        }
+      } else {
+        wordEl.textContent = query;
+        posEl.textContent = 'term';
+        sourceEl.textContent = 'not found';
+        defEl.textContent = `A simple definition for "${query}" could not be found.`;
+        contextBox.style.display = 'none';
+        synBox.style.display = 'none';
+        antBox.style.display = 'none';
+      }
+    };
+
+    searchBtn.addEventListener('click', () => executeLookup());
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        executeLookup();
+      }
+    });
+
+    if (speakBtn) {
+      speakBtn.addEventListener('click', async () => {
+        if (!activeWord || typeof window === 'undefined' || !window.speechSynthesis) return;
+
+        window.speechSynthesis.cancel();
+        const voices = await getVoicesAsync();
+        const selectedGender = (currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female').toLowerCase();
+        const preferredVoice = getResolvedVoice(voices, selectedGender);
+
+        const u = new SpeechSynthesisUtterance(activeWord);
+        u.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
+        u.lang = preferredVoice && preferredVoice.lang ? preferredVoice.lang : (navigator.language || 'en-US');
+        if (preferredVoice) {
+          u.voice = preferredVoice;
+        }
+
+        window.speechSynthesis.speak(u);
+      });
+    }
+  }
+
+  initPopupDictionary();
+
 });

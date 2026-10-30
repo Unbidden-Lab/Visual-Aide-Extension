@@ -299,11 +299,59 @@
         </div>
 
       </div>
+
+      <!-- Simplified Dictionary -->
+      <div class="section-header">
+        <span class="section-title">Simplified Dictionary</span>
+      </div>
+
+      <div class="control-card dict-card">
+        <div class="slider-group">
+          <label for="popup-dict-input">
+            Define Word
+            <button type="button" class="info-help-btn" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up simple definitions, contextual explanations, and antonyms" aria-label="Learn about Simplified Dictionary">?</button>
+          </label>
+          <div class="dict-input-row">
+            <input type="text" id="popup-dict-input" class="dict-input" placeholder="Type a word to define..." aria-label="Word to define in simplified dictionary">
+            <button type="button" id="popup-dict-btn" class="dict-search-btn" aria-label="Define word">Define</button>
+          </div>
+        </div>
+
+        <!-- Dictionary Lookup Result Container -->
+        <div id="popup-dict-result" class="dict-result-container hidden" aria-live="polite">
+          <div class="dict-result-header">
+            <div class="dict-word-info">
+              <span id="popup-dict-word" class="dict-result-word">Word</span>
+              <span id="popup-dict-pos" class="dict-result-pos">noun</span>
+              <span id="popup-dict-source" class="dict-result-source">offline</span>
+            </div>
+            <button type="button" id="popup-dict-speak-btn" class="dict-audio-btn" title="Pronounce word" aria-label="Pronounce word">Listen</button>
+          </div>
+
+          <p id="popup-dict-def" class="dict-result-def"></p>
+
+          <div id="popup-dict-context-box" class="dict-context-box" style="display: none;">
+            <span class="dict-sub-label">In Context:</span>
+            <p id="popup-dict-context-text" class="dict-context-text"></p>
+          </div>
+
+          <div id="popup-dict-syn-box" class="dict-chips-box" style="display: none;">
+            <span class="dict-sub-label">Simpler Words:</span>
+            <div id="popup-dict-syn-list" class="dict-chips-list"></div>
+          </div>
+
+          <div id="popup-dict-ant-box" class="dict-chips-box" style="display: none;">
+            <span class="dict-sub-label">Opposite Words (Antonyms):</span>
+            <div id="popup-dict-ant-list" class="dict-chips-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <!-- Floating Info Tooltip -->
   <div id="popup-tooltip" class="popup-tooltip" role="tooltip" aria-hidden="true"></div>
 
+  <script src="dictionary.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

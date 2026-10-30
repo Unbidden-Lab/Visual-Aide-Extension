@@ -583,3 +583,191 @@ input[type=range] {
   border-color: var(--accent-color, #00ffcc);
   background: rgba(0, 255, 204, 0.08);
 }
+
+/* Simplified Dictionary Card in Popup Menu */
+.dict-card {
+  padding-bottom: 14px;
+}
+
+.dict-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dict-input {
+  flex: 1;
+  background-color: var(--surface-color);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.dict-input:focus {
+  border-color: var(--accent-color);
+}
+
+.dict-search-btn {
+  background: var(--surface-color);
+  color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  border-radius: var(--border-radius);
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.dict-search-btn:hover {
+  background: var(--accent-dim);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.dict-result-container {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.dict-result-container.hidden {
+  display: none;
+}
+
+.dict-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.dict-word-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dict-result-word {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: capitalize;
+}
+
+.dict-result-pos {
+  font-size: 0.65rem;
+  background: #252525;
+  color: #bbb;
+  border: 1px solid #3a3a3a;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.dict-result-source {
+  font-size: 0.62rem;
+  background: rgba(0, 255, 204, 0.1);
+  color: var(--accent-color);
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.dict-audio-btn {
+  background: transparent;
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dict-audio-btn:hover {
+  background: var(--accent-dim);
+}
+
+.dict-result-def {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #e0e0e0;
+  margin: 6px 0 8px 0;
+}
+
+.dict-context-box {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.dict-context-text {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #cccccc;
+  margin: 4px 0 0 0;
+  border-left: 2px solid var(--accent-color);
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 4px 4px 0;
+}
+
+.dict-chips-box {
+  margin-top: 8px;
+}
+
+.dict-sub-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.dict-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.dict-chip-syn {
+  background: #252525;
+  color: var(--accent-color);
+  border: 1px solid #383838;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dict-chip-syn:hover {
+  border-color: var(--accent-color);
+  background: rgba(0, 255, 204, 0.12);
+}
+
+.dict-chip-ant {
+  background: #282425;
+  color: #ff99aa;
+  border: 1px solid #4a2d33;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dict-chip-ant:hover {
+  border-color: #ff99aa;
+  background: rgba(255, 153, 170, 0.18);
+}

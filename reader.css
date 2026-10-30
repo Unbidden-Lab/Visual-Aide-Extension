@@ -975,3 +975,17 @@ body.contrast-inverted .reader-tooltip-desc {
   border-radius: 16px;
   font-size: 0.82rem;
 }
+
+.synonym-chip,
+.antonym-chip {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.synonym-chip:hover {
+  border-color: var(--accent);
+  background: rgba(0, 255, 204, 0.15);
+}
+.antonym-chip:hover {
+  border-color: #ff99aa;
+  background: rgba(255, 153, 170, 0.18);
+}
