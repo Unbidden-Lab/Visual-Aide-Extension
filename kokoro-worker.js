@@ -48,6 +48,70 @@ async function getOrInitTts(tier = 'wasm', progressCallback) {
     if (targetTier === 'webgpu') {
       try {
         console.log('Initializing Kokoro Turbo Mode (WebGPU / fp32)...');
+
+        // Forward actual adapter limits to requestDevice so Chromium does not clamp buffer sizes
+        if (typeof navigator !== 'undefined' && navigator.gpu) {
+          const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+          if (adapter) {
+            const requiredLimits = {};
+            if (adapter.limits?.maxBufferSize) {
+              requiredLimits.maxBufferSize = adapter.limits.maxBufferSize;
+            }
+            if (adapter.limits?.maxStorageBufferBindingSize) {
+              requiredLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+            }
+
+            const requiredFeatures = [];
+            if (adapter.features?.has('shader-f16')) {
+              requiredFeatures.push('shader-f16');
+            }
+
+            const device = await adapter.requestDevice({
+              requiredLimits,
+              requiredFeatures
+            });
+
+            // Runtime driver crash recovery (device.lost listener)
+            device.lost.then(async (info) => {
+              console.warn('WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
+              if (info.reason !== 'destroyed') {
+                currentTtsInstance = null;
+                initPromise = null;
+                currentTier = 'wasm';
+                if (globalThis.ort?.env?.webgpu) delete globalThis.ort.env.webgpu.device;
+                if (env?.backends?.onnx?.webgpu) delete env.backends.onnx.webgpu.device;
+
+                try {
+                  console.log('Recovering from GPU crash: switching Kokoro to Lightweight WASM mode...');
+                  await getOrInitTts('wasm');
+                } catch (recErr) {
+                  console.error('WASM recovery failed:', recErr);
+                }
+
+                self.postMessage({
+                  type: 'device_lost',
+                  reason: info.reason,
+                  message: info.message || 'GPU driver reset / TDR crash',
+                  fallbackTier: 'wasm'
+                });
+              }
+            });
+
+            // Explicitly assign resulting device to ort.env.webgpu.device
+            if (!globalThis.ort) globalThis.ort = {};
+            if (!globalThis.ort.env) globalThis.ort.env = {};
+            if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
+            globalThis.ort.env.webgpu.device = device;
+            globalThis.ort.env.webgpu.adapter = adapter;
+
+            if (env && env.backends && env.backends.onnx) {
+              if (!env.backends.onnx.webgpu) env.backends.onnx.webgpu = {};
+              env.backends.onnx.webgpu.device = device;
+              env.backends.onnx.webgpu.adapter = adapter;
+            }
+          }
+        }
+
         tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
           dtype: 'fp32',
           device: 'webgpu',
@@ -107,11 +171,38 @@ self.onmessage = async (e) => {
   if (action === 'generate') {
     try {
       const { text, voice, speed, tier } = data || {};
-      const tts = await getOrInitTts(tier);
-      const rawAudio = await tts.generate(text, {
-        voice: voice || 'af_heart',
-        speed: typeof speed === 'number' ? speed : 1.0
-      });
+      let tts = null;
+      try {
+        tts = await getOrInitTts(tier);
+      } catch (initErr) {
+        if (tier === 'webgpu') {
+          console.warn('WebGPU init failed during generate, recovering to WASM:', initErr);
+          tts = await getOrInitTts('wasm');
+        } else {
+          throw initErr;
+        }
+      }
+
+      let rawAudio;
+      try {
+        rawAudio = await tts.generate(text, {
+          voice: voice || 'af_heart',
+          speed: typeof speed === 'number' ? speed : 1.0
+        });
+      } catch (genErr) {
+        if (currentTier === 'webgpu') {
+          console.warn('WebGPU generation crashed (driver reset/TDR), falling back to WASM:', genErr);
+          currentTtsInstance = null;
+          initPromise = null;
+          tts = await getOrInitTts('wasm');
+          rawAudio = await tts.generate(text, {
+            voice: voice || 'af_heart',
+            speed: typeof speed === 'number' ? speed : 1.0
+          });
+        } else {
+          throw genErr;
+        }
+      }
 
       const blob = rawAudio.toBlob();
       self.postMessage({

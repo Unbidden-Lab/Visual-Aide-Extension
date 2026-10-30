@@ -48,6 +48,15 @@ function getOrCreateWorker() {
       const cb = workerCallbacks.get(id);
       if (!cb) return;
 
+      if (type === 'device_lost') {
+        console.warn('Received WebGPU device_lost notification from worker, falling back to WASM:', data || '');
+        currentLoadedTier = 'wasm';
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+          chrome.storage.sync.set({ ttsEngineTier: 'wasm' });
+        }
+        return;
+      }
+
       if (type === 'progress') {
         if (typeof cb.onProgress === 'function') {
           cb.onProgress(data);
@@ -78,16 +87,56 @@ function getOrCreateWorker() {
 
 /**
  * Check if WebGPU is supported and available on this device/browser
+ * @param {number} minStorageBufferSize - Minimum required buffer binding size (e.g. 268435456 for 256MB)
  */
-async function isWebGpuSupported() {
+async function isWebGpuSupported(minStorageBufferSize = 0) {
   if (typeof navigator === 'undefined' || !navigator.gpu) {
     return false;
   }
   try {
-    const adapter = await navigator.gpu.requestAdapter();
-    return Boolean(adapter);
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) return false;
+    if (minStorageBufferSize > 0) {
+      const size = adapter.limits?.maxStorageBufferBindingSize || 0;
+      if (size < minStorageBufferSize) return false;
+    }
+    return true;
   } catch (err) {
     return false;
+  }
+}
+
+/**
+ * Query active GPU adapter information and memory limits
+ */
+async function getGpuDeviceInfo() {
+  if (typeof navigator === 'undefined' || !navigator.gpu) {
+    return { supported: false, chipName: 'None (WebGPU unsupported)', maxStorageBuffer: 0, meetsRequirements: false };
+  }
+  try {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) {
+      return { supported: false, chipName: 'None (No GPU adapter)', maxStorageBuffer: 0, meetsRequirements: false };
+    }
+    let chipName = '';
+    if (adapter.info) {
+      chipName = adapter.info.description || adapter.info.device || adapter.info.architecture || adapter.info.vendor || 'Generic GPU';
+    } else if (typeof adapter.requestAdapterInfo === 'function') {
+      const info = await adapter.requestAdapterInfo();
+      chipName = info.description || info.device || info.architecture || info.vendor || 'Generic GPU';
+    }
+    const maxStorageBuffer = adapter.limits?.maxStorageBufferBindingSize || 0;
+    const meetsRequirements = maxStorageBuffer >= 268435456; // 256 MB
+
+    return {
+      supported: true,
+      chipName: chipName || 'Active GPU',
+      maxStorageBuffer,
+      meetsRequirements,
+      adapter
+    };
+  } catch (e) {
+    return { supported: false, chipName: 'Error detecting GPU', maxStorageBuffer: 0, meetsRequirements: false };
   }
 }
 
@@ -249,6 +298,54 @@ async function loadKokoroModel(progressCallback, tier = 'wasm') {
     if (targetTier === 'webgpu') {
       try {
         console.log('Loading Kokoro Turbo Mode (WebGPU / fp32)...');
+
+        if (typeof navigator !== 'undefined' && navigator.gpu) {
+          const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+          if (adapter) {
+            const requiredLimits = {};
+            if (adapter.limits?.maxBufferSize) {
+              requiredLimits.maxBufferSize = adapter.limits.maxBufferSize;
+            }
+            if (adapter.limits?.maxStorageBufferBindingSize) {
+              requiredLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+            }
+
+            const requiredFeatures = [];
+            if (adapter.features?.has('shader-f16')) {
+              requiredFeatures.push('shader-f16');
+            }
+
+            const device = await adapter.requestDevice({
+              requiredLimits,
+              requiredFeatures
+            });
+
+            device.lost.then(async (info) => {
+              console.warn('Main thread WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
+              if (info.reason !== 'destroyed') {
+                kokoroTtsInstance = null;
+                kokoroModelInitPromise = null;
+                currentLoadedTier = 'wasm';
+                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                  chrome.storage.sync.set({ ttsEngineTier: 'wasm' });
+                }
+              }
+            });
+
+            if (!globalThis.ort) globalThis.ort = {};
+            if (!globalThis.ort.env) globalThis.ort.env = {};
+            if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
+            globalThis.ort.env.webgpu.device = device;
+            globalThis.ort.env.webgpu.adapter = adapter;
+
+            if (env && env.backends && env.backends.onnx) {
+              if (!env.backends.onnx.webgpu) env.backends.onnx.webgpu = {};
+              env.backends.onnx.webgpu.device = device;
+              env.backends.onnx.webgpu.adapter = adapter;
+            }
+          }
+        }
+
         tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
           dtype: 'fp32',
           device: 'webgpu',
@@ -550,6 +647,7 @@ const KokoroEngine = {
   VOICES: KOKORO_VOICES,
   isKokoroVoice,
   isWebGpuSupported,
+  getGpuDeviceInfo,
   isKokoroModelCached,
   loadKokoroModel,
   getKokoroInstance,

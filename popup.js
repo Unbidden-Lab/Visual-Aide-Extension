@@ -299,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         previousTier = syncTier;
         previousVoice = currentSettings.ttsVoice || 'female';
         updateNeuralTierVisibility(currentSettings.ttsVoice);
+        checkGpuAdmissionAndInfo();
       });
     }
 
@@ -691,16 +692,77 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Hardware admission lock and GPU transparency guidance
+  async function checkGpuAdmissionAndInfo() {
+    let isSupported = false;
+    let meetsRequirements = false;
+    let chipName = 'Detecting...';
+
+    try {
+      if (typeof KokoroEngine !== 'undefined' && typeof KokoroEngine.getGpuDeviceInfo === 'function') {
+        const info = await KokoroEngine.getGpuDeviceInfo();
+        isSupported = info.supported;
+        meetsRequirements = info.meetsRequirements;
+        chipName = info.chipName;
+      } else if (typeof navigator !== 'undefined' && navigator.gpu) {
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+        if (adapter) {
+          isSupported = true;
+          if (adapter.info) {
+            chipName = adapter.info.description || adapter.info.device || adapter.info.architecture || adapter.info.vendor || 'Generic GPU';
+          } else if (typeof adapter.requestAdapterInfo === 'function') {
+            const info = await adapter.requestAdapterInfo();
+            chipName = info.description || info.device || info.architecture || info.vendor || 'Generic GPU';
+          }
+          const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
+          meetsRequirements = (maxStorage >= 268435456); // 256 MB
+        } else {
+          chipName = 'None (WebGPU unavailable)';
+        }
+      } else {
+        chipName = 'None (WebGPU unsupported)';
+      }
+    } catch (e) {
+      console.warn('GPU admission detection notice:', e);
+      chipName = 'Unknown GPU';
+    }
+
+    const gpuChipNameEl = document.getElementById('gpu-chip-name');
+    if (gpuChipNameEl) {
+      gpuChipNameEl.textContent = chipName;
+    }
+
+    // Hardware admission lock for Turbo Mode option (Requirement 2)
+    const turboOption = ttsEngineTierSelect?.querySelector('option[value="webgpu"]');
+    if (turboOption) {
+      if (!isSupported || !meetsRequirements) {
+        turboOption.disabled = true;
+        turboOption.textContent = 'Turbo Mode (GPU / ~330 MB) (Unsupported Hardware)';
+        if (currentSettings.ttsEngineTier === 'webgpu') {
+          currentSettings.ttsEngineTier = 'wasm';
+          previousTier = 'wasm';
+          if (ttsEngineTierSelect) ttsEngineTierSelect.value = 'wasm';
+          saveSettings({ ttsEngineTier: 'wasm' });
+        }
+      } else {
+        turboOption.disabled = false;
+        turboOption.textContent = 'Turbo Mode (GPU / ~330 MB)';
+      }
+    }
+
+    return { isSupported, meetsRequirements, chipName };
+  }
+
   // TTS Engine Tier Selector (Universal WASM vs Turbo WebGPU)
   if (ttsEngineTierSelect) {
     ttsEngineTierSelect.addEventListener('change', async (e) => {
       const chosenTier = e.target.value;
 
       if (chosenTier === 'webgpu') {
-        // 1. Hardware & browser capability check for WebGPU
-        const supported = await isWebGpuSupported();
-        if (!supported) {
-          alert('WebGPU acceleration is not supported or enabled on your system or graphics hardware. Reverting to Lightweight Mode (CPU).');
+        // 1. Hardware admission check (WebGPU & 256 MB buffer limit)
+        const gpuStatus = await checkGpuAdmissionAndInfo();
+        if (!gpuStatus.isSupported || !gpuStatus.meetsRequirements) {
+          alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on your graphics hardware. Reverting to Lightweight Mode (CPU).');
           ttsEngineTierSelect.value = 'wasm';
           currentSettings.ttsEngineTier = 'wasm';
           previousTier = 'wasm';
@@ -708,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        // 2. WebGPU checks passed! Check if FP32 model is cached
+        // 2. Hardware admission checks passed! Check if FP32 model is cached
         const cached = await isKokoroModelCached('webgpu');
         if (!cached) {
           // Automatically prompt user to download the FP32 model (~330 MB)
@@ -873,6 +935,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     previousTier = settings.ttsEngineTier || 'wasm';
     updateNeuralTierVisibility(settings.ttsVoice || settings.ttsVoiceGender || 'female');
+    checkGpuAdmissionAndInfo();
     if (ttsSpeedSelect) {
       ttsSpeedSelect.value = (settings.ttsSpeed || settings.ttsRate || 1.0).toString();
     }

@@ -298,6 +298,7 @@ function initSettingsSync() {
       previousReaderTier = syncTier;
       previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
       updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice);
+      checkReaderGpuAdmission();
     });
   }
 
@@ -763,15 +764,51 @@ function initToolbarControls() {
     });
   }
 
+  async function checkReaderGpuAdmission() {
+    let isSupported = false;
+    let meetsRequirements = false;
+    try {
+      if (typeof KokoroEngine !== 'undefined' && typeof KokoroEngine.getGpuDeviceInfo === 'function') {
+        const info = await KokoroEngine.getGpuDeviceInfo();
+        isSupported = info.supported;
+        meetsRequirements = info.meetsRequirements;
+      } else if (typeof navigator !== 'undefined' && navigator.gpu) {
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+        if (adapter) {
+          isSupported = true;
+          const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
+          meetsRequirements = (maxStorage >= 268435456);
+        }
+      }
+    } catch (_) {}
+
+    const turboOption = readerTierSelect?.querySelector('option[value="webgpu"]');
+    if (turboOption) {
+      if (!isSupported || !meetsRequirements) {
+        turboOption.disabled = true;
+        turboOption.textContent = 'Turbo (GPU / ~330 MB) (Unsupported Hardware)';
+        if (currentReaderSettings.ttsEngineTier === 'webgpu') {
+          currentReaderSettings.ttsEngineTier = 'wasm';
+          previousReaderTier = 'wasm';
+          if (readerTierSelect) readerTierSelect.value = 'wasm';
+          saveReaderSettings();
+        }
+      } else {
+        turboOption.disabled = false;
+        turboOption.textContent = 'Turbo (GPU / ~330 MB)';
+      }
+    }
+  }
+
   // TTS Engine Tier selector (Universal WASM vs Turbo WebGPU)
   const readerTierSelect = document.getElementById('reader-tts-engine-tier');
   if (readerTierSelect) {
     readerTierSelect.addEventListener('change', async (e) => {
       const chosenTier = e.target.value;
       if (chosenTier === 'webgpu') {
-        const supported = await isWebGpuSupported();
+        const supported = await isWebGpuSupported(268435456);
         if (!supported) {
-          alert('WebGPU acceleration is not supported or enabled on your system or graphics hardware. Reverting to Lightweight Mode (CPU).');
+          alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on your graphics hardware. Reverting to Lightweight Mode (CPU).');
           readerTierSelect.value = 'wasm';
           currentReaderSettings.ttsEngineTier = 'wasm';
           previousReaderTier = 'wasm';
@@ -875,6 +912,7 @@ function updateToolbarUI() {
   if (tierEl) tierEl.value = currentReaderSettings.ttsEngineTier || 'wasm';
   previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
   updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice || 'female');
+  checkReaderGpuAdmission();
 }
 
 function applyAllReaderStyles() {
