@@ -296,6 +296,7 @@ function setupStyleBlock() {
       'va-contrast-dark',
       'va-contrast-navy',
       'va-contrast-inverted',
+      'va-contrast-custom-dark',
       'va-font-color-active'
     );
     updateIrlenContrast('default');
@@ -369,6 +370,13 @@ function setupStyleBlock() {
       background-color: ${resolvedBg} !important;
     }
 
+    /* Dark custom contrast background application */
+    html.va-contrast-custom-dark,
+    html.va-contrast-custom-dark body,
+    html.va-contrast-custom-dark :is(main, [role="main"], article, section) {
+      background-color: ${resolvedBg} !important;
+    }
+
     /* Universal Dark & Inverted Irlen Contrast Modes */
     html.va-contrast-dark {
       filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(0.95) !important;
@@ -394,10 +402,12 @@ function setupStyleBlock() {
     }
   `;
 
-  // Font Color Handling (Only applied when user explicitly selects a custom font color)
+  // Font Color Handling (Applied when user selects custom contrast mode OR explicit font color)
   let fontColorRules = '';
   let resolvedFontColor = null;
-  if (currentSettings.fontColor && currentSettings.fontColor !== 'default') {
+  if (currentSettings.contrastMode === 'custom' && currentSettings.customFontColor) {
+    resolvedFontColor = currentSettings.customFontColor;
+  } else if (currentSettings.fontColor && currentSettings.fontColor !== 'default') {
     resolvedFontColor = currentSettings.fontColor === 'custom'
       ? (currentSettings.customFontColor || '#111111')
       : currentSettings.fontColor;
@@ -735,6 +745,19 @@ function setupStyleBlock() {
 // Non-destructive optical tinting via viewport blend multiply
 // and high-fidelity media-preserving dark filter inversion.
 // -------------------------------------------------------------
+function isDarkColor(hex) {
+  if (!hex || typeof hex !== 'string') return false;
+  let clean = hex.trim().replace(/^#/, '');
+  if (clean.length === 3) clean = clean.split('').map((c) => c + c).join('');
+  if (clean.length !== 6) return false;
+  const num = parseInt(clean, 16);
+  if (isNaN(num)) return false;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+}
+
 function updateIrlenContrast(mode, customBg) {
   const root = document.documentElement;
 
@@ -743,7 +766,8 @@ function updateIrlenContrast(mode, customBg) {
     'va-contrast-active',
     'va-contrast-dark',
     'va-contrast-navy',
-    'va-contrast-inverted'
+    'va-contrast-inverted',
+    'va-contrast-custom-dark'
   );
 
   if (!currentSettings.isActive || !mode || mode === 'default') {
@@ -772,6 +796,13 @@ function updateIrlenContrast(mode, customBg) {
 
   // Soft Tint Modes: Cream, Peach, Mint, or Custom
   root.classList.add('va-contrast-active');
+
+  if (mode === 'custom' && isDarkColor(customBg)) {
+    // Dark custom background: avoid multiply blend which obscures light text
+    if (irlenVeilEl) irlenVeilEl.style.display = 'none';
+    root.classList.add('va-contrast-custom-dark');
+    return;
+  }
 
   const tintMap = {
     cream: '#f5eedb',

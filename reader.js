@@ -47,7 +47,9 @@ const DEFAULT_READER_SETTINGS = {
   spacing: 0,
   leading: 1.6,
   fontColor: 'default',
+  customFontColor: '#111111',
   contrast: 'default',
+  customBgColor: '#fbf0d9',
   bionic: false,
   ruler: false,
   ttsVoice: 'female',
@@ -293,8 +295,10 @@ function initSettingsSync() {
     if (s.spacing !== undefined) currentReaderSettings.spacing = s.spacing;
     if (s.leading !== undefined) currentReaderSettings.leading = s.leading;
     if (s.fontColor) currentReaderSettings.fontColor = s.fontColor;
+    if (s.customFontColor) currentReaderSettings.customFontColor = s.customFontColor;
     if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
     if (s.contrast) currentReaderSettings.contrast = s.contrast;
+    if (s.customBgColor) currentReaderSettings.customBgColor = s.customBgColor;
     if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
     if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
     if (s.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
@@ -850,7 +854,26 @@ function applyAllReaderStyles() {
     currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default'
   );
 
-  if (hasCustomFontColor) {
+  if (currentReaderSettings.contrast === 'custom') {
+    const customBg = currentReaderSettings.customBgColor || '#fbf0d9';
+    const customFg = currentReaderSettings.customFontColor || '#111111';
+    root.style.setProperty('--reader-bg', customBg);
+    root.style.setProperty('--reader-surface', customBg);
+    root.style.setProperty('--reader-text', customFg);
+    body.style.setProperty('--reader-text', customFg, 'important');
+    if (docContainer) {
+      docContainer.style.setProperty('--reader-text', customFg, 'important');
+      docContainer.style.setProperty('color', customFg, 'important');
+      docContainer.style.setProperty('-webkit-text-fill-color', customFg, 'important');
+      const textEls = docContainer.querySelectorAll(
+        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+      );
+      textEls.forEach((el) => {
+        el.style.setProperty('color', customFg, 'important');
+        el.style.setProperty('-webkit-text-fill-color', customFg, 'important');
+      });
+    }
+  } else if (hasCustomFontColor) {
     const chosenColor = currentReaderSettings.fontColor;
     root.style.setProperty('--reader-text', chosenColor);
     body.style.setProperty('--reader-text', chosenColor, 'important');

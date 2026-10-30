@@ -236,6 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const fontSelect = document.getElementById('font-family');
   const fontColorSelect = document.getElementById('font-color');
   const contrastModeSelect = document.getElementById('contrast-mode');
+  const customContrastCard = document.getElementById('custom-contrast-card');
+  const customFontColorInput = document.getElementById('custom-font-color');
+  const customFontHexInput = document.getElementById('custom-font-hex');
+  const customBgColorInput = document.getElementById('custom-bg-color');
+  const customBgHexInput = document.getElementById('custom-bg-hex');
+  const wcagRatioVal = document.getElementById('wcag-ratio-val');
+  const wcagGradeBadge = document.getElementById('wcag-grade-badge');
+  const contrastSamplePreview = document.getElementById('contrast-sample-preview');
   const fontSizeSlider = document.getElementById('font-size');
   const fontSizeVal = document.getElementById('font-size-val');
   const trackingSlider = document.getElementById('tracking');
@@ -422,8 +430,97 @@ document.addEventListener('DOMContentLoaded', () => {
       saveAndApply(currentSettings);
       updateBadges(currentSettings);
       updateLevelButtons(0);
+      updateCustomContrastUI(currentSettings);
     });
   });
+
+  if (contrastModeSelect) {
+    contrastModeSelect.addEventListener('change', () => {
+      currentSettings.contrastMode = contrastModeSelect.value;
+      currentSettings.isActive = true;
+      currentSettings.level = 0;
+      updateLevelButtons(0);
+      saveAndApply(currentSettings);
+      updateCustomContrastUI(currentSettings);
+    });
+  }
+
+  // Custom Color Contrast Chooser Listeners
+  if (customFontColorInput) {
+    customFontColorInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      currentSettings.customFontColor = val;
+      currentSettings.contrastMode = 'custom';
+      currentSettings.isActive = true;
+      currentSettings.level = 0;
+      if (contrastModeSelect) contrastModeSelect.value = 'custom';
+      if (customFontHexInput) customFontHexInput.value = val.toUpperCase();
+      updateCustomContrastUI(currentSettings);
+      updateLevelButtons(0);
+      saveAndApply(currentSettings);
+    });
+  }
+
+  if (customFontHexInput) {
+    customFontHexInput.addEventListener('input', (e) => {
+      const validHex = normalizeHex(e.target.value);
+      if (validHex) {
+        currentSettings.customFontColor = validHex;
+        currentSettings.contrastMode = 'custom';
+        currentSettings.isActive = true;
+        currentSettings.level = 0;
+        if (contrastModeSelect) contrastModeSelect.value = 'custom';
+        if (customFontColorInput) customFontColorInput.value = validHex;
+        updateCustomContrastUI(currentSettings);
+        updateLevelButtons(0);
+        saveAndApply(currentSettings);
+      }
+    });
+
+    customFontHexInput.addEventListener('blur', () => {
+      if (customFontHexInput) {
+        customFontHexInput.value = (currentSettings.customFontColor || '#111111').toUpperCase();
+      }
+    });
+  }
+
+  if (customBgColorInput) {
+    customBgColorInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      currentSettings.customBgColor = val;
+      currentSettings.contrastMode = 'custom';
+      currentSettings.isActive = true;
+      currentSettings.level = 0;
+      if (contrastModeSelect) contrastModeSelect.value = 'custom';
+      if (customBgHexInput) customBgHexInput.value = val.toUpperCase();
+      updateCustomContrastUI(currentSettings);
+      updateLevelButtons(0);
+      saveAndApply(currentSettings);
+    });
+  }
+
+  if (customBgHexInput) {
+    customBgHexInput.addEventListener('input', (e) => {
+      const validHex = normalizeHex(e.target.value);
+      if (validHex) {
+        currentSettings.customBgColor = validHex;
+        currentSettings.contrastMode = 'custom';
+        currentSettings.isActive = true;
+        currentSettings.level = 0;
+        if (contrastModeSelect) contrastModeSelect.value = 'custom';
+        if (customBgColorInput) customBgColorInput.value = validHex;
+        updateCustomContrastUI(currentSettings);
+        updateLevelButtons(0);
+        saveAndApply(currentSettings);
+      }
+    });
+
+    customBgHexInput.addEventListener('blur', () => {
+      if (customBgHexInput) {
+        customBgHexInput.value = (currentSettings.customBgColor || '#fbf0d9').toUpperCase();
+      }
+    });
+  }
 
   // Force Left Align toggle
   leftAlignToggle.addEventListener('change', (e) => {
@@ -910,6 +1007,115 @@ document.addEventListener('DOMContentLoaded', () => {
     rulerHeightVal.textContent = `${settings.rulerHeight || 40}px`;
   }
 
+  // -------------------------------------------------------------
+  // WCAG 2.1 Color Luminance & Contrast Calculation
+  // -------------------------------------------------------------
+  function hexToRgb(hex) {
+    if (!hex || typeof hex !== 'string') return null;
+    let clean = hex.trim().replace(/^#/, '');
+    if (clean.length === 3) {
+      clean = clean.split('').map((c) => c + c).join('');
+    }
+    if (clean.length !== 6) return null;
+    const num = parseInt(clean, 16);
+    if (isNaN(num)) return null;
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255
+    };
+  }
+
+  function getRelativeLuminance(rgb) {
+    const srgb = [rgb.r, rgb.g, rgb.b].map((val) => {
+      const s = val / 255;
+      return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+  }
+
+  function getWcagContrast(fgHex, bgHex) {
+    const fgRgb = hexToRgb(fgHex);
+    const bgRgb = hexToRgb(bgHex);
+    if (!fgRgb || !bgRgb) {
+      return { ratio: 1, ratioFormatted: '1.0:1', grade: 'Fail', gradeClass: 'grade-fail' };
+    }
+    const l1 = getRelativeLuminance(fgRgb);
+    const l2 = getRelativeLuminance(bgRgb);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
+    const ratio = (lighter + 0.05) / (darker + 0.05);
+
+    let grade = 'Fail';
+    let gradeClass = 'grade-fail';
+    if (ratio >= 7.0) {
+      grade = 'AAA Pass';
+      gradeClass = 'grade-aaa';
+    } else if (ratio >= 4.5) {
+      grade = 'AA Pass';
+      gradeClass = 'grade-aa';
+    } else if (ratio >= 3.0) {
+      grade = 'AA Large';
+      gradeClass = 'grade-aa-large';
+    }
+
+    return {
+      ratio,
+      ratioFormatted: `${ratio.toFixed(1)}:1`,
+      grade,
+      gradeClass
+    };
+  }
+
+  function normalizeHex(val) {
+    if (!val) return null;
+    let str = val.trim();
+    if (!str.startsWith('#')) str = '#' + str;
+    if (/^#[0-9A-Fa-f]{6}$/.test(str)) {
+      return str.toLowerCase();
+    }
+    if (/^#[0-9A-Fa-f]{3}$/.test(str)) {
+      return ('#' + str[1] + str[1] + str[2] + str[2] + str[3] + str[3]).toLowerCase();
+    }
+    return null;
+  }
+
+  function updateCustomContrastUI(settings) {
+    if (!customContrastCard) return;
+
+    const fontColor = settings.customFontColor || '#111111';
+    const bgColor = settings.customBgColor || '#fbf0d9';
+
+    if (customFontColorInput && customFontColorInput.value !== fontColor) {
+      customFontColorInput.value = fontColor;
+    }
+    if (customFontHexInput && document.activeElement !== customFontHexInput) {
+      customFontHexInput.value = fontColor.toUpperCase();
+    }
+    if (customBgColorInput && customBgColorInput.value !== bgColor) {
+      customBgColorInput.value = bgColor;
+    }
+    if (customBgHexInput && document.activeElement !== customBgHexInput) {
+      customBgHexInput.value = bgColor.toUpperCase();
+    }
+
+    const contrast = getWcagContrast(fontColor, bgColor);
+    if (wcagRatioVal) {
+      wcagRatioVal.textContent = contrast.ratioFormatted;
+    }
+    if (wcagGradeBadge) {
+      wcagGradeBadge.textContent = contrast.grade;
+      wcagGradeBadge.className = `wcag-grade-badge ${contrast.gradeClass}`;
+    }
+    if (contrastSamplePreview) {
+      contrastSamplePreview.style.color = fontColor;
+      contrastSamplePreview.style.backgroundColor = bgColor;
+    }
+
+    const isCustom = settings.contrastMode === 'custom';
+    customContrastCard.classList.toggle('custom-active', isCustom);
+  }
+
   function updateUI(settings) {
     updateLevelButtons(settings.level || 0);
 
@@ -951,6 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateBadges(settings);
+    updateCustomContrastUI(settings);
   }
 
   function saveAndApply(settings) {

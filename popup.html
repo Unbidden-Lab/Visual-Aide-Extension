@@ -79,11 +79,11 @@
           </select>
         </div>
 
-        <!-- Irlen Color Contrast Presets -->
+        <!-- Irlen Color Contrast Presets & Custom Chooser -->
         <div class="slider-group">
           <label for="contrast-mode">
             Color Contrast (Irlen Support)
-            <button type="button" class="info-help-btn" data-tooltip-title="Color Contrast" data-tooltip-desc="Soothing background tints to reduce visual stress and glare" aria-label="Learn about Color Contrast">?</button>
+            <button type="button" class="info-help-btn" data-tooltip-title="Color Contrast" data-tooltip-desc="Soothing background tints to reduce visual stress, or choose custom accessible colors" aria-label="Learn about Color Contrast">?</button>
           </label>
           <select id="contrast-mode" class="custom-select">
             <option value="default">Website Default</option>
@@ -93,7 +93,41 @@
             <option value="navy">Navy Night (Amber on Deep Navy)</option>
             <option value="dark">Charcoal Dark (Light on Dark)</option>
             <option value="inverted">High Contrast Inverted (Yellow on Black)</option>
+            <option value="custom">Custom Color Pair</option>
           </select>
+
+          <!-- Custom Color Contrast Chooser -->
+          <div class="custom-contrast-card" id="custom-contrast-card">
+            <div class="custom-contrast-pickers">
+              <div class="color-picker-item">
+                <span class="color-picker-label">Text Color</span>
+                <div class="color-input-wrapper">
+                  <input type="color" id="custom-font-color" value="#111111" aria-label="Custom text color picker">
+                  <input type="text" id="custom-font-hex" class="color-hex-input" value="#111111" maxlength="7" spellcheck="false" aria-label="Custom text color hex code">
+                </div>
+              </div>
+
+              <div class="color-picker-item">
+                <span class="color-picker-label">Background</span>
+                <div class="color-input-wrapper">
+                  <input type="color" id="custom-bg-color" value="#fbf0d9" aria-label="Custom background color picker">
+                  <input type="text" id="custom-bg-hex" class="color-hex-input" value="#fbf0d9" maxlength="7" spellcheck="false" aria-label="Custom background color hex code">
+                </div>
+              </div>
+            </div>
+
+            <!-- Live WCAG Contrast Ratio Badge & Preview -->
+            <div class="wcag-status-row">
+              <div class="wcag-badge-container">
+                <span class="wcag-badge-label">WCAG:</span>
+                <span class="wcag-ratio-val" id="wcag-ratio-val">13.7:1</span>
+                <span class="wcag-grade-badge grade-aaa" id="wcag-grade-badge">AAA Pass</span>
+              </div>
+              <div class="contrast-sample-preview" id="contrast-sample-preview" title="Live Contrast Sample Preview">
+                Aa Sample
+              </div>
+            </div>
+          </div>
         </div>
 
                 <!-- Font Size Slider -->
