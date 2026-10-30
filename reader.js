@@ -56,6 +56,8 @@ const DEFAULT_READER_SETTINGS = {
 };
 
 let currentReaderSettings = { ...DEFAULT_READER_SETTINGS };
+let previousReaderVoice = 'female';
+let previousReaderTier = 'wasm';
 
 // -------------------------------------------------------------
 // Natural Neural Voice Matcher (Aria for Female, Guy for Male)
@@ -464,8 +466,8 @@ function initToolbarControls() {
 
   // TTS Voice selector & Kokoro Studio Modal
   const voiceSelect = document.getElementById('reader-tts-voice');
-  let previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
-  let previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
+  previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
+  previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
 
   const readerKokoroModal = document.getElementById('reader-kokoro-modal');
   const readerKokoroDesc = document.getElementById('reader-kokoro-desc');
@@ -479,23 +481,6 @@ function initToolbarControls() {
 
   let pendingReaderKokoroVoice = null;
   let pendingReaderKokoroTier = null;
-
-  function updateReaderNeuralTierVisibility(voiceId) {
-    const isKokoro = isKokoroVoice(voiceId || currentReaderSettings.ttsVoice);
-    const tierGroup = document.getElementById('reader-tts-engine-tier-group');
-    const tierSelect = document.getElementById('reader-tts-engine-tier');
-    if (!tierGroup || !tierSelect) return;
-
-    if (isKokoro) {
-      tierGroup.classList.remove('tier-disabled');
-      tierSelect.disabled = false;
-      tierSelect.removeAttribute('aria-disabled');
-    } else {
-      tierGroup.classList.add('tier-disabled');
-      tierSelect.disabled = true;
-      tierSelect.setAttribute('aria-disabled', 'true');
-    }
-  }
 
   function showReaderKokoroModal(targetVoice) {
     pendingReaderKokoroVoice = targetVoice;
@@ -675,42 +660,6 @@ function initToolbarControls() {
     });
   }
 
-  async function checkReaderGpuAdmission() {
-    let isSupported = false;
-    let meetsRequirements = false;
-    try {
-      if (typeof KokoroEngine !== 'undefined' && typeof KokoroEngine.getGpuDeviceInfo === 'function') {
-        const info = await KokoroEngine.getGpuDeviceInfo();
-        isSupported = info.supported;
-        meetsRequirements = info.meetsRequirements;
-      } else if (typeof navigator !== 'undefined' && navigator.gpu) {
-        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-        if (adapter) {
-          isSupported = true;
-          const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
-          meetsRequirements = (maxStorage >= 268435456);
-        }
-      }
-    } catch (_) {}
-
-    const turboOption = readerTierSelect?.querySelector('option[value="webgpu"]');
-    if (turboOption) {
-      if (!isSupported || !meetsRequirements) {
-        turboOption.disabled = true;
-        turboOption.textContent = 'Turbo (GPU / ~330 MB) (Unsupported Hardware)';
-        if (currentReaderSettings.ttsEngineTier === 'webgpu') {
-          currentReaderSettings.ttsEngineTier = 'wasm';
-          previousReaderTier = 'wasm';
-          if (readerTierSelect) readerTierSelect.value = 'wasm';
-          saveReaderSettings();
-        }
-      } else {
-        turboOption.disabled = false;
-        turboOption.textContent = 'Turbo (GPU / ~330 MB)';
-      }
-    }
-  }
-
   // TTS Engine Tier selector (Universal WASM vs Turbo WebGPU)
   const readerTierSelect = document.getElementById('reader-tts-engine-tier');
   if (readerTierSelect) {
@@ -761,6 +710,62 @@ function initToolbarControls() {
   if (prevBtn) prevBtn.addEventListener('click', goToPreviousPage);
   const nextBtn = document.getElementById('reader-page-next');
   if (nextBtn) nextBtn.addEventListener('click', goToNextPage);
+}
+
+function updateReaderNeuralTierVisibility(voiceId) {
+  const isKokoro = typeof isKokoroVoice === 'function'
+    ? isKokoroVoice(voiceId || currentReaderSettings.ttsVoice)
+    : false;
+  const tierGroup = document.getElementById('reader-tts-engine-tier-group');
+  const tierSelect = document.getElementById('reader-tts-engine-tier');
+  if (!tierGroup || !tierSelect) return;
+
+  if (isKokoro) {
+    tierGroup.classList.remove('tier-disabled');
+    tierSelect.disabled = false;
+    tierSelect.removeAttribute('aria-disabled');
+  } else {
+    tierGroup.classList.add('tier-disabled');
+    tierSelect.disabled = true;
+    tierSelect.setAttribute('aria-disabled', 'true');
+  }
+}
+
+async function checkReaderGpuAdmission() {
+  let isSupported = false;
+  let meetsRequirements = false;
+  try {
+    if (typeof KokoroEngine !== 'undefined' && typeof KokoroEngine.getGpuDeviceInfo === 'function') {
+      const info = await KokoroEngine.getGpuDeviceInfo();
+      isSupported = info.supported;
+      meetsRequirements = info.meetsRequirements;
+    } else if (typeof navigator !== 'undefined' && navigator.gpu) {
+      const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+      if (adapter) {
+        isSupported = true;
+        const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
+        meetsRequirements = (maxStorage >= 268435456);
+      }
+    }
+  } catch (_) {}
+
+  const tierSelect = document.getElementById('reader-tts-engine-tier');
+  const turboOption = tierSelect?.querySelector('option[value="webgpu"]');
+  if (turboOption) {
+    if (!isSupported || !meetsRequirements) {
+      turboOption.disabled = true;
+      turboOption.textContent = 'Turbo (GPU / ~330 MB) (Unsupported Hardware)';
+      if (currentReaderSettings.ttsEngineTier === 'webgpu') {
+        currentReaderSettings.ttsEngineTier = 'wasm';
+        previousReaderTier = 'wasm';
+        if (tierSelect) tierSelect.value = 'wasm';
+        saveReaderSettings();
+      }
+    } else {
+      turboOption.disabled = false;
+      turboOption.textContent = 'Turbo (GPU / ~330 MB)';
+    }
+  }
 }
 
 function updateToolbarUI() {
