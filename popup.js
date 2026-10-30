@@ -1171,6 +1171,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isCustom = settings.contrastMode === 'custom';
     customContrastCard.classList.toggle('custom-active', isCustom);
+    customContrastCard.classList.toggle('hidden', !isCustom);
+    customContrastCard.style.display = isCustom ? 'flex' : 'none';
   }
 
   function updateUI(settings) {

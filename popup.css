@@ -930,20 +930,25 @@ input[type=range] {
 }
 /* Custom Color Contrast Chooser */
 .custom-contrast-card {
+  display: none;
   margin-top: 8px;
   background-color: var(--card-bg, #1c1c1c);
   border: 1px solid var(--border-color, #2e2e2e);
   border-radius: var(--border-radius, 8px);
   padding: 8px 10px;
-  display: flex;
   flex-direction: column;
   gap: 8px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .custom-contrast-card.custom-active {
+  display: flex;
   border-color: var(--accent-color, #00ffcc);
   box-shadow: 0 0 8px var(--accent-glow, rgba(0, 255, 204, 0.2));
+}
+
+.custom-contrast-card.hidden {
+  display: none !important;
 }
 
 .custom-contrast-pickers {
