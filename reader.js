@@ -1490,14 +1490,14 @@ function handleTtsPlay() {
 
   // Kokoro playback controls (Play / Pause / Resume)
   if (isKokoroVoice(activeVoice)) {
-    if (isKokoroAudioPaused() && readerTtsQueue.length > 0) {
+    if (isKokoroAudioPaused()) {
       resumeKokoroAudio();
       updateReaderTtsUi(true);
       return;
     }
 
     const selection = window.getSelection().toString().trim();
-    if (isKokoroAudioPlaying() && readerTtsQueue.length > 0 && !selection) {
+    if (isKokoroAudioPlaying() && !selection) {
       pauseKokoroAudio();
       updateReaderTtsUi(false);
       return;
@@ -1514,16 +1514,26 @@ function handleTtsPlay() {
 
     if (!textToRead) return;
 
-    const chunks = chunkReaderTtsText(textToRead);
-    if (chunks.length === 0) return;
-
     handleTtsStop();
-    readerTtsQueue = chunks;
-    readerTtsIndex = 0;
 
     // Immediately update Play button to active generation state and disable double-clicks
     setReaderTtsGenerating(true);
-    playNextReaderTtsChunk();
+
+    playKokoroAudio(textToRead, {
+      voice: activeVoice,
+      speed: speedVal,
+      onStart: () => {
+        setReaderTtsGenerating(false);
+        updateReaderTtsUi(true);
+      },
+      onEnd: () => {
+        handleTtsStop();
+      },
+      onError: (err) => {
+        console.error('Reader Kokoro synthesis error:', err);
+        handleTtsStop();
+      }
+    });
     return;
   }
 

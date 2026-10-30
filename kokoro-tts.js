@@ -1,8 +1,8 @@
 /**
  * Visual Aide - Kokoro Studio Neural TTS Engine
  * Integrates Kokoro-82M ONNX model client-side via kokoro.js.
- * Provides on-demand download, local cache detection, background Web Worker generation,
- * and audio playback.
+ * Provides WebGPU device acceleration with WASM fallback, dedicated Web Worker offloading,
+ * sentence chunking streaming queue with proactive background prefetching, and audio playback.
  */
 
 const KOKORO_VOICES = {
@@ -20,6 +20,11 @@ let currentKokoroAudioUrl = null;
 let kokoroWorker = null;
 let workerMsgId = 0;
 const workerCallbacks = new Map();
+
+let activeStreamingSessionId = 0;
+let activeSentenceQueue = [];
+let currentSentenceIndex = -1;
+let nextSentencePrefetchPromise = null;
 
 /**
  * Initialize or retrieve the dedicated Kokoro Web Worker
@@ -76,6 +81,37 @@ function isKokoroVoice(voiceId) {
 }
 
 /**
+ * Split text into individual sentences for low-latency streaming
+ * Splits by . ! ? and newlines, preserving punctuation and word boundaries
+ */
+function splitIntoSentences(text) {
+  if (!text) return [];
+
+  const clean = text
+    .replace(/\uFB00/g, 'ff')
+    .replace(/\uFB01/g, 'fi')
+    .replace(/\uFB02/g, 'fl')
+    .replace(/\uFB03/g, 'ffi')
+    .replace(/\uFB04/g, 'fl')
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, ' ')
+    .trim();
+
+  if (!clean) return [];
+
+  const rawSentences = clean.match(/[^.!?\n\r]+[.!?]+|[^.!?\n\r]+/g) || [clean];
+  const sentences = [];
+
+  for (let i = 0; i < rawSentences.length; i++) {
+    const s = rawSentences[i].replace(/\s+/g, ' ').trim();
+    if (s && /[a-zA-Z0-9]/.test(s)) {
+      sentences.push(s);
+    }
+  }
+
+  return sentences;
+}
+
+/**
  * Check whether the Kokoro ONNX model weights are already cached locally
  */
 async function isKokoroModelCached() {
@@ -121,6 +157,7 @@ async function isKokoroModelCached() {
 
 /**
  * Load or initialize the Kokoro TTS engine on-demand with progress tracking
+ * Attempts WebGPU device acceleration first, gracefully falling back to WASM CPU runner.
  */
 async function loadKokoroModel(progressCallback) {
   if (kokoroTtsInstance) {
@@ -170,14 +207,36 @@ async function loadKokoroModel(progressCallback) {
       }
     }
 
-    const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
-      dtype: 'q8',
-      progress_callback: (info) => {
-        if (typeof progressCallback === 'function') {
-          progressCallback(info);
+    let tts = null;
+
+    // Attempt WebGPU device acceleration
+    try {
+      tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+        dtype: 'q8',
+        device: 'webgpu',
+        progress_callback: (info) => {
+          if (typeof progressCallback === 'function') {
+            progressCallback(info);
+          }
         }
-      }
-    });
+      });
+    } catch (gpuErr) {
+      console.warn('Kokoro WebGPU device acceleration unavailable, falling back to WASM:', gpuErr);
+      tts = null;
+    }
+
+    // Graceful fallback to WASM CPU runner
+    if (!tts) {
+      tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+        dtype: 'q8',
+        device: 'wasm',
+        progress_callback: (info) => {
+          if (typeof progressCallback === 'function') {
+            progressCallback(info);
+          }
+        }
+      });
+    }
 
     kokoroTtsInstance = tts;
 
@@ -207,7 +266,7 @@ function getKokoroInstance() {
 }
 
 /**
- * Generate audio Blob via Web Worker or main-thread fallback
+ * Generate audio Blob for a single text segment via Web Worker or main-thread fallback
  */
 async function generateKokoroAudioBlob(text, options = {}) {
   const voice = options.voice || 'af_heart';
@@ -249,33 +308,144 @@ async function generateKokoroAudio(text, options = {}) {
 }
 
 /**
- * Play text using Kokoro Studio voice with HTML5 Audio element
+ * Play text using streaming sentence queue with proactive background prefetching.
+ * 1. Splits input text into individual sentences.
+ * 2. Immediately synthesizes sentence 0 and starts audio playback as soon as its buffer resolves (minimizing time-to-first-sound).
+ * 3. While sentence N plays, proactively pre-generates sentence N+1 in the worker thread.
+ * 4. Transitions seamlessly without audible gaps between sentences.
  */
 async function playKokoroAudio(text, options = {}) {
   stopKokoroAudio();
 
-  const blob = await generateKokoroAudioBlob(text, options);
-  const audioUrl = URL.createObjectURL(blob);
+  const sessionId = ++activeStreamingSessionId;
+  const sentences = splitIntoSentences(text);
 
-  currentKokoroAudioUrl = audioUrl;
-  currentKokoroAudio = new Audio(audioUrl);
-  currentKokoroAudio.playbackRate = 1.0;
-
-  currentKokoroAudio.onplay = () => {
-    if (typeof options.onStart === 'function') options.onStart();
-  };
-
-  currentKokoroAudio.onended = () => {
-    cleanupKokoroAudio();
+  if (sentences.length === 0) {
     if (typeof options.onEnd === 'function') options.onEnd();
-  };
+    return null;
+  }
 
-  currentKokoroAudio.onerror = (e) => {
+  activeSentenceQueue = sentences;
+  currentSentenceIndex = 0;
+
+  // 1. Immediately synthesize the first sentence
+  let firstBlob;
+  try {
+    firstBlob = await generateKokoroAudioBlob(sentences[0], options);
+  } catch (err) {
+    if (sessionId !== activeStreamingSessionId) return null;
+    console.error('Failed to synthesize initial sentence:', err);
+    if (typeof options.onError === 'function') options.onError(err);
+    return null;
+  }
+
+  if (sessionId !== activeStreamingSessionId) return null;
+
+  // Helper to proactively launch worker synthesis for sentence index N+1
+  function prefetchSentence(index) {
+    if (index < activeSentenceQueue.length && sessionId === activeStreamingSessionId) {
+      return generateKokoroAudioBlob(activeSentenceQueue[index], options).catch((err) => {
+        console.warn(`Prefetch failed for sentence index ${index}:`, err);
+        return null;
+      });
+    }
+    return null;
+  }
+
+  // 2. While sentence 0 plays, proactively start generating sentence 1 in the background
+  nextSentencePrefetchPromise = prefetchSentence(1);
+
+  // 3. Play sentence blob and handle sequential transition
+  async function playSentenceBlob(blob, sentenceIndex) {
+    if (sessionId !== activeStreamingSessionId || !blob) {
+      if (sessionId === activeStreamingSessionId && sentenceIndex < activeSentenceQueue.length - 1) {
+        currentSentenceIndex++;
+        advanceToNextSentence();
+      }
+      return;
+    }
+
     cleanupKokoroAudio();
-    if (typeof options.onError === 'function') options.onError(e);
-  };
 
-  await currentKokoroAudio.play();
+    const audioUrl = URL.createObjectURL(blob);
+    currentKokoroAudioUrl = audioUrl;
+    currentKokoroAudio = new Audio(audioUrl);
+    currentKokoroAudio.playbackRate = 1.0;
+
+    currentKokoroAudio.onplay = () => {
+      if (sessionId !== activeStreamingSessionId) return;
+      if (sentenceIndex === 0 && typeof options.onStart === 'function') {
+        options.onStart();
+      }
+      if (typeof options.onSentenceStart === 'function') {
+        options.onSentenceStart(sentenceIndex, activeSentenceQueue[sentenceIndex]);
+      }
+    };
+
+    currentKokoroAudio.onended = () => {
+      if (sessionId !== activeStreamingSessionId) return;
+      currentSentenceIndex++;
+      advanceToNextSentence();
+    };
+
+    currentKokoroAudio.onerror = (e) => {
+      if (sessionId !== activeStreamingSessionId) return;
+      console.warn(`Audio error on sentence index ${sentenceIndex}:`, e);
+      currentSentenceIndex++;
+      advanceToNextSentence();
+    };
+
+    try {
+      await currentKokoroAudio.play();
+    } catch (playErr) {
+      if (sessionId !== activeStreamingSessionId) return;
+      console.warn('Audio play execution failed:', playErr);
+      if (typeof options.onError === 'function') options.onError(playErr);
+    }
+  }
+
+  async function advanceToNextSentence() {
+    if (sessionId !== activeStreamingSessionId) return;
+
+    if (currentSentenceIndex >= activeSentenceQueue.length) {
+      cleanupKokoroAudio();
+      activeSentenceQueue = [];
+      nextSentencePrefetchPromise = null;
+      if (typeof options.onEnd === 'function') options.onEnd();
+      return;
+    }
+
+    const nextIndex = currentSentenceIndex;
+    let nextBlob = null;
+
+    if (nextSentencePrefetchPromise) {
+      try {
+        nextBlob = await nextSentencePrefetchPromise;
+      } catch (err) {
+        console.warn('Prefetch await failed:', err);
+      }
+    }
+
+    if (sessionId !== activeStreamingSessionId) return;
+
+    // Fallback if prefetch failed or was null
+    if (!nextBlob) {
+      try {
+        nextBlob = await generateKokoroAudioBlob(activeSentenceQueue[nextIndex], options);
+      } catch (genErr) {
+        console.warn(`On-demand synthesis failed for sentence ${nextIndex}:`, genErr);
+      }
+    }
+
+    if (sessionId !== activeStreamingSessionId) return;
+
+    // While sentence N plays, proactively prefetch sentence N+1
+    nextSentencePrefetchPromise = prefetchSentence(nextIndex + 1);
+
+    await playSentenceBlob(nextBlob, nextIndex);
+  }
+
+  await playSentenceBlob(firstBlob, 0);
   return currentKokoroAudio;
 }
 
@@ -302,14 +472,18 @@ function resumeKokoroAudio() {
 }
 
 /**
- * Stop and clean up active Kokoro playback
+ * Stop and clean up active Kokoro playback and cancel background streaming queue
  */
 function stopKokoroAudio() {
+  activeStreamingSessionId++;
   if (currentKokoroAudio) {
     currentKokoroAudio.pause();
     currentKokoroAudio.currentTime = 0;
   }
   cleanupKokoroAudio();
+  activeSentenceQueue = [];
+  currentSentenceIndex = -1;
+  nextSentencePrefetchPromise = null;
 }
 
 function cleanupKokoroAudio() {
@@ -335,6 +509,7 @@ const KokoroEngine = {
   isKokoroModelCached,
   loadKokoroModel,
   getKokoroInstance,
+  splitIntoSentences,
   generateKokoroAudioBlob,
   generateKokoroAudio,
   playKokoroAudio,

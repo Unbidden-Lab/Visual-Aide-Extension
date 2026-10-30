@@ -1,12 +1,7 @@
 /**
  * Visual Aide - Offscreen Audio Pipeline
- * Handles background synthesis and audio playback for content scripts on normal web pages.
+ * Handles background synthesis and streaming audio playback for content scripts on normal web pages.
  */
-
-let offscreenQueue = [];
-let offscreenIndex = 0;
-let offscreenVoice = 'af_heart';
-let offscreenSpeed = 1.0;
 
 function broadcastStatus(status, extra = {}) {
   try {
@@ -18,67 +13,6 @@ function broadcastStatus(status, extra = {}) {
       // Ignore when no listener is connected
     });
   } catch (_) {}
-}
-
-function chunkOffscreenText(text) {
-  if (!text) return [];
-  const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
-  const chunks = [];
-  let current = '';
-  for (let i = 0; i < sentences.length; i++) {
-    const s = sentences[i].trim();
-    if (!s) continue;
-    if ((current + ' ' + s).length > 180 && current) {
-      chunks.push(current.trim());
-      current = s;
-    } else {
-      current = current ? current + ' ' + s : s;
-    }
-  }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
-}
-
-async function playNextOffscreenChunk() {
-  if (offscreenIndex >= offscreenQueue.length) {
-    if (typeof KokoroEngine !== 'undefined') {
-      KokoroEngine.stopKokoroAudio();
-    }
-    broadcastStatus('ended');
-    return;
-  }
-
-  const chunk = offscreenQueue[offscreenIndex];
-  if (!chunk || !/[a-zA-Z0-9]/.test(chunk)) {
-    offscreenIndex++;
-    playNextOffscreenChunk();
-    return;
-  }
-
-  try {
-    await KokoroEngine.playKokoroAudio(chunk, {
-      voice: offscreenVoice,
-      speed: offscreenSpeed,
-      onStart: () => {
-        broadcastStatus('playing');
-      },
-      onEnd: () => {
-        offscreenIndex++;
-        playNextOffscreenChunk();
-      },
-      onError: (err) => {
-        console.warn('Offscreen Kokoro chunk error:', err);
-        offscreenIndex++;
-        playNextOffscreenChunk();
-      }
-    });
-  } catch (err) {
-    console.error('Offscreen Kokoro synthesis error:', err);
-    if (typeof KokoroEngine !== 'undefined') {
-      KokoroEngine.stopKokoroAudio();
-    }
-    broadcastStatus('error', { error: err.message || String(err) });
-  }
 }
 
 async function handleKokoroPlay(text, voice, speed, sendResponse) {
@@ -94,20 +28,23 @@ async function handleKokoroPlay(text, voice, speed, sendResponse) {
       return;
     }
 
-    offscreenVoice = voice || 'af_heart';
-    offscreenSpeed = typeof speed === 'number' ? speed : 1.0;
-    offscreenQueue = chunkOffscreenText(text);
-    offscreenIndex = 0;
-
-    if (offscreenQueue.length === 0) {
-      sendResponse({ ok: false, error: 'empty_text' });
-      return;
-    }
-
     sendResponse({ ok: true, status: 'generating' });
     broadcastStatus('generating');
 
-    playNextOffscreenChunk();
+    await KokoroEngine.playKokoroAudio(text, {
+      voice: voice || 'af_heart',
+      speed: typeof speed === 'number' ? speed : 1.0,
+      onStart: () => {
+        broadcastStatus('playing');
+      },
+      onEnd: () => {
+        broadcastStatus('ended');
+      },
+      onError: (err) => {
+        console.error('Offscreen Kokoro streaming error:', err);
+        broadcastStatus('error', { error: err.message || String(err) });
+      }
+    });
   } catch (err) {
     console.error('handleKokoroPlay error:', err);
     sendResponse({ ok: false, error: err.message || String(err) });
@@ -145,8 +82,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (typeof KokoroEngine !== 'undefined') {
       KokoroEngine.stopKokoroAudio();
     }
-    offscreenQueue = [];
-    offscreenIndex = 0;
     broadcastStatus('stopped');
     sendResponse({ ok: true });
     return false;

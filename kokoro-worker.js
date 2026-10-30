@@ -27,20 +27,47 @@ if (env) {
 
 /**
  * Initialize Kokoro model instance inside worker thread
+ * Attempts WebGPU device acceleration first, gracefully falling back to WASM CPU runner.
  */
 async function getOrInitTts(progressCallback) {
   if (ttsInstance) return ttsInstance;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
-      dtype: 'q8',
-      progress_callback: (info) => {
-        if (typeof progressCallback === 'function') {
-          progressCallback(info);
+    let tts = null;
+
+    // 1. Attempt WebGPU device acceleration
+    try {
+      console.log('Attempting Kokoro model initialization with WebGPU acceleration...');
+      tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+        dtype: 'q8',
+        device: 'webgpu',
+        progress_callback: (info) => {
+          if (typeof progressCallback === 'function') {
+            progressCallback(info);
+          }
         }
-      }
-    });
+      });
+      console.log('Kokoro WebGPU device initialized successfully.');
+    } catch (gpuErr) {
+      console.warn('Kokoro WebGPU device acceleration unavailable, falling back to WASM:', gpuErr);
+      tts = null;
+    }
+
+    // 2. Graceful fallback to WASM CPU runner
+    if (!tts) {
+      tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+        dtype: 'q8',
+        device: 'wasm',
+        progress_callback: (info) => {
+          if (typeof progressCallback === 'function') {
+            progressCallback(info);
+          }
+        }
+      });
+      console.log('Kokoro WASM CPU runner initialized successfully.');
+    }
+
     ttsInstance = tts;
     return tts;
   })();
