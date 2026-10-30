@@ -52,7 +52,7 @@ const CONTRAST_THEMES = {
 let currentSettings = {
   isActive: true,
   level: 0,
-  font: 'OpenDyslexic',
+  font: 'Lexend',
   fontSize: 100,
   tracking: 0,
   spacing: 0,
@@ -642,6 +642,50 @@ function setupStyleBlock() {
     .va-syn-chip {
       background: #252525;
       color: #00ffcc;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+    .va-context-box {
+      margin-top: 6px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-left: 2px solid #00ffcc;
+      padding: 6px 8px;
+      border-radius: 0 4px 4px 0;
+    }
+    .va-context-label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .va-context-text {
+      font-size: 12px;
+      color: #e0e0e0;
+      line-height: 1.4;
+    }
+    .va-ant-box {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .va-ant-label {
+      color: #888;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .va-ant-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .va-ant-chip {
+      background: #252525;
+      color: #ff99aa;
+      border: 1px solid #4a2d33;
       padding: 2px 7px;
       border-radius: 10px;
       font-size: 11px;
@@ -1409,6 +1453,16 @@ async function openInPageDictionary(word, x, y) {
   }
 
   if (entry) {
+    let contextHtml = '';
+    if (entry.contextualDef) {
+      contextHtml = `
+        <div class="va-context-box">
+          <span class="va-context-label">In Context:</span>
+          <div class="va-context-text">${entry.contextualDef}</div>
+        </div>
+      `;
+    }
+
     let synHtml = '';
     if (entry.synonyms && entry.synonyms.length > 0) {
       synHtml = `
@@ -1416,6 +1470,18 @@ async function openInPageDictionary(word, x, y) {
           <span class="va-syn-label">Simpler Words:</span>
           <div class="va-syn-chips">
             ${entry.synonyms.map(s => `<span class="va-syn-chip">${s}</span>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    let antHtml = '';
+    if (entry.antonyms && entry.antonyms.length > 0) {
+      antHtml = `
+        <div class="va-ant-box">
+          <span class="va-ant-label">Opposite Words (Antonyms):</span>
+          <div class="va-ant-chips">
+            ${entry.antonyms.map(a => `<span class="va-ant-chip">${a}</span>`).join('')}
           </div>
         </div>
       `;
@@ -1434,7 +1500,9 @@ async function openInPageDictionary(word, x, y) {
         <span class="va-badge source">${entry.source || 'dictionary'}</span>
       </div>
       <div class="va-def-text">${entry.definition}</div>
+      ${contextHtml}
       ${synHtml}
+      ${antHtml}
     `;
 
     document.getElementById('va-dict-close').onclick = removeDictModal;
@@ -1529,8 +1597,15 @@ function boot() {
   }
 
   chrome.storage.local.get(['va_settings'], (result) => {
-    if (result.va_settings) {
-      applyAll(result.va_settings);
+    let s = result.va_settings;
+    if (!s || Object.keys(s).length === 0) {
+      try {
+        const localS = localStorage.getItem('va_settings');
+        if (localS) s = JSON.parse(localS);
+      } catch (e) {}
+    }
+    if (s) {
+      applyAll(s);
     } else {
       applyAll(currentSettings);
     }

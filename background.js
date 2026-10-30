@@ -3,7 +3,7 @@ importScripts('dictionary.js');
 const DEFAULT_SETTINGS = {
   isActive: true,
   level: 0,
-  font: 'OpenDyslexic',
+  font: 'Lexend',
   tracking: 0,
   spacing: 0,
   leading: 1.5,
@@ -60,7 +60,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         word: request.word,
         pos: 'term',
         definition: `Could not load definition for "${request.word}".`,
+        contextualDef: '',
         synonyms: [],
+        antonyms: [],
         example: '',
         source: 'error'
       }));

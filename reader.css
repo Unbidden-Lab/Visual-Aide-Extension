@@ -10,7 +10,7 @@
   --accent: #00ffcc;
   --accent-dark: #00ccaa;
   --accent-dim: rgba(0, 255, 204, 0.15);
-  --font-family: 'OpenDyslexic', system-ui, sans-serif;
+  --font-family: 'Lexend', system-ui, sans-serif;
   --font-size: 18px;
   --tracking: 0px;
   --spacing: 0px;
@@ -948,4 +948,30 @@ body.contrast-inverted .reader-tooltip-title {
 }
 body.contrast-inverted .reader-tooltip-desc {
   color: #ffffff;
+}
+
+.dict-context-text {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #e0e0e0;
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0 4px 4px 0;
+}
+
+.antonyms-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.antonym-chip {
+  background: #282828;
+  color: #ff99aa;
+  border: 1px solid #4a2d33;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.82rem;
 }

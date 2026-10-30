@@ -41,7 +41,7 @@ Double-click on any word (such as *aberration*, *alleviate*, *ambiguous*, *compr
 `;
 
 let currentReaderSettings = {
-  font: 'OpenDyslexic',
+  font: 'Lexend',
   fontSize: 18,
   tracking: 0,
   spacing: 0,
@@ -293,22 +293,44 @@ function initSettingsSync() {
     });
   }
 
+  const applyStoredSettings = (s) => {
+    if (!s) return;
+    if (s.font) currentReaderSettings.font = s.font;
+    if (s.readerFontSize !== undefined || s.fontSize !== undefined) {
+      const parsedSize = parseInt(s.readerFontSize || s.fontSize, 10);
+      if (!isNaN(parsedSize) && parsedSize >= 12 && parsedSize <= 48) {
+        currentReaderSettings.fontSize = parsedSize;
+      }
+    }
+    if (s.tracking !== undefined) currentReaderSettings.tracking = s.tracking;
+    if (s.spacing !== undefined) currentReaderSettings.spacing = s.spacing;
+    if (s.leading !== undefined) currentReaderSettings.leading = s.leading;
+    if (s.fontColor) currentReaderSettings.fontColor = s.fontColor;
+    if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
+    if (s.contrast) currentReaderSettings.contrast = s.contrast;
+    if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
+    if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
+    if (s.ttsVoice && !currentReaderSettings.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
+    if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
+    applyAllReaderStyles();
+    updateToolbarUI();
+  };
+
+  // Immediate local cache retrieval (persists across sessions locally)
+  try {
+    const localReader = localStorage.getItem('va_reader_settings');
+    if (localReader) applyStoredSettings(JSON.parse(localReader));
+    else {
+      const localMain = localStorage.getItem('va_settings');
+      if (localMain) applyStoredSettings(JSON.parse(localMain));
+    }
+  } catch (e) {}
+
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['va_settings'], (result) => {
-      if (result.va_settings) {
-        const s = result.va_settings;
-        if (s.font) currentReaderSettings.font = s.font;
-        if (s.tracking !== undefined) currentReaderSettings.tracking = s.tracking;
-        if (s.spacing !== undefined) currentReaderSettings.spacing = s.spacing;
-        if (s.leading !== undefined) currentReaderSettings.leading = s.leading;
-        if (s.fontColor) currentReaderSettings.fontColor = s.fontColor;
-        if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
-        if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
-        if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
-        if (s.ttsVoice && !currentReaderSettings.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
-        if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
-        applyAllReaderStyles();
-        updateToolbarUI();
+    chrome.storage.local.get(['va_settings', 'va_reader_settings'], (result) => {
+      const s = result.va_reader_settings || result.va_settings;
+      if (s) {
+        applyStoredSettings(s);
       }
     });
 
@@ -332,19 +354,12 @@ function initSettingsSync() {
             }
           }
         }
-        if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
-          const s = changes.va_settings.newValue;
-          if (s.font) currentReaderSettings.font = s.font;
-          if (s.tracking !== undefined) currentReaderSettings.tracking = s.tracking;
-          if (s.spacing !== undefined) currentReaderSettings.spacing = s.spacing;
-          if (s.leading !== undefined) currentReaderSettings.leading = s.leading;
-          if (s.fontColor) currentReaderSettings.fontColor = s.fontColor;
-          if (s.contrastMode) currentReaderSettings.contrast = s.contrastMode;
-          if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
-          if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
-          if (s.ttsVoice && !changes.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
-          applyAllReaderStyles();
-          updateToolbarUI();
+        if (area === 'local') {
+          if (changes.va_reader_settings && changes.va_reader_settings.newValue) {
+            applyStoredSettings(changes.va_reader_settings.newValue);
+          } else if (changes.va_settings && changes.va_settings.newValue) {
+            applyStoredSettings(changes.va_settings.newValue);
+          }
         }
       });
     }
@@ -355,6 +370,11 @@ function initSettingsSync() {
 }
 
 function saveReaderSettings() {
+  // Persist locally across sessions via localStorage
+  try {
+    localStorage.setItem('va_reader_settings', JSON.stringify(currentReaderSettings));
+  } catch (e) {}
+
   if (typeof chrome !== 'undefined' && chrome.storage) {
     // Save voice and speed to sync storage
     if (chrome.storage.sync) {
@@ -374,6 +394,8 @@ function saveReaderSettings() {
       chrome.storage.local.get(['va_settings'], (result) => {
         const existing = result.va_settings || {};
         existing.font = currentReaderSettings.font;
+        existing.fontSize = currentReaderSettings.fontSize;
+        existing.readerFontSize = currentReaderSettings.fontSize;
         existing.tracking = currentReaderSettings.tracking;
         existing.spacing = currentReaderSettings.spacing;
         existing.leading = currentReaderSettings.leading;
@@ -385,7 +407,13 @@ function saveReaderSettings() {
         existing.ttsVoiceGender = currentReaderSettings.ttsVoice || 'female';
         existing.ttsSpeed = currentReaderSettings.ttsSpeed || 1.0;
         existing.ttsRate = currentReaderSettings.ttsSpeed || 1.0;
-        chrome.storage.local.set({ va_settings: existing });
+        try {
+          localStorage.setItem('va_settings', JSON.stringify(existing));
+        } catch (e) {}
+        chrome.storage.local.set({
+          va_settings: existing,
+          va_reader_settings: currentReaderSettings
+        });
       });
     }
   }
@@ -530,7 +558,7 @@ function initToolbarControls() {
 
 function updateToolbarUI() {
   const fontEl = document.getElementById('reader-font');
-  if (fontEl) fontEl.value = currentReaderSettings.font || 'OpenDyslexic';
+  if (fontEl) fontEl.value = currentReaderSettings.font || 'Lexend';
 
   const fontSizeVal = document.getElementById('font-size-val');
   if (fontSizeVal) fontSizeVal.textContent = `${currentReaderSettings.fontSize}px`;
@@ -802,40 +830,161 @@ async function processPdfData(typedArray, fileName) {
 
 function formatPdfTextToParagraphs(items) {
   if (!items || items.length === 0) return [];
-  const paragraphs = [];
-  let currentPara = '';
 
+  // 1. Filter out empty items and extract geometrical layout
+  const textItems = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
+    if (!item) continue;
     const str = item.str;
+    if (str === undefined || str === null) continue;
 
-    if (!str || str.trim() === '') {
-      if (currentPara.trim().length > 0) {
-        paragraphs.push(currentPara.trim());
-        currentPara = '';
-      }
+    const tx = (item.transform && item.transform[4] !== undefined) ? item.transform[4] : 0;
+    const ty = (item.transform && item.transform[5] !== undefined) ? item.transform[5] : 0;
+    const height = item.height || (item.transform ? Math.abs(item.transform[3] || item.transform[0] || 12) : 12);
+    const width = item.width || 0;
+
+    textItems.push({
+      str,
+      x: tx,
+      y: ty,
+      width,
+      height,
+      hasEOL: Boolean(item.hasEOL)
+    });
+  }
+
+  if (textItems.length === 0) return [];
+
+  // 2. Group items into physical horizontal lines based on y-coordinate
+  const lines = [];
+  let currentLine = [];
+  let currentY = null;
+  let currentLineHeight = 12;
+
+  for (let i = 0; i < textItems.length; i++) {
+    const it = textItems[i];
+    if (currentY === null) {
+      currentY = it.y;
+      currentLineHeight = it.height;
+      currentLine.push(it);
     } else {
-      const cleanStr = str.trim();
-      if (cleanStr) {
-        if (currentPara.length > 0) {
-          if (!/\s$/.test(currentPara) && !/^\s/.test(str)) {
-            currentPara += ' ';
-          }
-        }
-        currentPara += cleanStr;
+      const yDiff = Math.abs(it.y - currentY);
+      // Belonging to the same line: vertical distance within 35% of font height or 3px
+      const threshold = Math.max(3, currentLineHeight * 0.35);
+      if (yDiff <= threshold) {
+        currentLine.push(it);
+      } else {
+        lines.push({ items: currentLine, y: currentY, height: currentLineHeight });
+        currentLine = [it];
+        currentY = it.y;
+        currentLineHeight = it.height;
       }
+    }
+  }
+  if (currentLine.length > 0) {
+    lines.push({ items: currentLine, y: currentY, height: currentLineHeight });
+  }
 
-      if (item.hasEOL) {
-        if (currentPara.length > 140 || /[.!?]$/.test(currentPara.trim())) {
-          paragraphs.push(currentPara.trim());
-          currentPara = '';
+  // 3. Assemble each line horizontally, inserting single spaces between word gaps
+  const processedLines = [];
+  for (const line of lines) {
+    line.items.sort((a, b) => a.x - b.x);
+    let lineText = '';
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    for (let j = 0; j < line.items.length; j++) {
+      const it = line.items[j];
+      const s = it.str;
+      if (!s) continue;
+      if (it.x < minX) minX = it.x;
+      const endX = it.x + (it.width || 0);
+      if (endX > maxX) maxX = endX;
+
+      if (lineText.length > 0) {
+        const prevItem = line.items[j - 1];
+        const gap = prevItem ? (it.x - (prevItem.x + prevItem.width)) : 0;
+        const needsSpace = !lineText.endsWith(' ') && !s.startsWith(' ') && gap > 1.5;
+        if (needsSpace) {
+          lineText += ' ';
         }
+      }
+      lineText += s;
+    }
+
+    const trimmed = lineText.trim();
+    if (trimmed.length > 0) {
+      processedLines.push({
+        text: trimmed,
+        y: line.y,
+        height: line.height,
+        x: minX === Infinity ? 0 : minX,
+        width: (maxX > minX && minX !== Infinity) ? (maxX - minX) : 0
+      });
+    }
+  }
+
+  if (processedLines.length === 0) return [];
+
+  // Calculate typical vertical line spacing (delta Y)
+  const yDeltas = [];
+  for (let i = 0; i < processedLines.length - 1; i++) {
+    const dy = processedLines[i].y - processedLines[i + 1].y;
+    if (dy > 0 && dy < 100) yDeltas.push(dy);
+  }
+  yDeltas.sort((a, b) => a - b);
+  const medianDy = yDeltas.length > 0 ? yDeltas[Math.floor(yDeltas.length / 2)] : 16;
+  const paraGapThreshold = Math.max(medianDy * 1.5, medianDy + 5);
+
+  // 4. Stitch lines into paragraphs (connecting soft wraps, resolving hyphens)
+  const paragraphs = [];
+  let currentParaText = '';
+
+  for (let i = 0; i < processedLines.length; i++) {
+    const cur = processedLines[i];
+    const prev = i > 0 ? processedLines[i - 1] : null;
+
+    let isNewParagraph = false;
+
+    if (!prev) {
+      isNewParagraph = true;
+    } else {
+      const dy = prev.y - cur.y;
+      const isBullet = /^([•\-\*]|\d+\.|\([a-zA-Z0-9]+\))\s/.test(cur.text);
+      const prevEndsWithTerm = /[.!?:"'”]$/.test(prev.text);
+      const isExtraVerticalGap = dy >= paraGapThreshold || dy < -10;
+      const isIndented = cur.x > (prev.x + 14);
+
+      if (isBullet) {
+        isNewParagraph = true;
+      } else if (isExtraVerticalGap) {
+        isNewParagraph = true;
+      } else if (prevEndsWithTerm && (isIndented || dy > medianDy * 1.25)) {
+        isNewParagraph = true;
+      }
+    }
+
+    if (isNewParagraph) {
+      if (currentParaText.trim().length > 0) {
+        paragraphs.push(currentParaText.trim());
+      }
+      currentParaText = cur.text;
+    } else {
+      // Soft line wrap: join with previous line
+      // Check for hyphenation break: e.g. 'read-' + 'ing' -> 'reading'
+      if (/[a-zA-Z]-$/.test(currentParaText) && /^[a-zA-Z]/.test(cur.text)) {
+        currentParaText = currentParaText.slice(0, -1) + cur.text;
+      } else if (currentParaText.endsWith(' ') || cur.text.startsWith(' ')) {
+        currentParaText += cur.text;
+      } else {
+        currentParaText += ' ' + cur.text;
       }
     }
   }
 
-  if (currentPara.trim()) {
-    paragraphs.push(currentPara.trim());
+  if (currentParaText.trim().length > 0) {
+    paragraphs.push(currentParaText.trim());
   }
 
   return paragraphs;
@@ -1261,8 +1410,12 @@ async function openDictionaryModal(word) {
   const posEl = document.getElementById('dict-pos');
   const sourceEl = document.getElementById('dict-source');
   const defEl = document.getElementById('dict-definition');
+  const contextBlock = document.getElementById('dict-context-block');
+  const contextEl = document.getElementById('dict-context');
   const synBlock = document.getElementById('dict-synonyms-block');
   const synList = document.getElementById('dict-synonyms');
+  const antBlock = document.getElementById('dict-antonyms-block');
+  const antList = document.getElementById('dict-antonyms');
   const exBlock = document.getElementById('dict-example-block');
   const exEl = document.getElementById('dict-example');
   const ttsBtn = document.getElementById('dict-tts-btn');
@@ -1305,11 +1458,25 @@ async function openDictionaryModal(word) {
     sourceEl.textContent = entry.source || 'dictionary';
     defEl.textContent = entry.definition;
 
+    if (entry.contextualDef) {
+      if (contextBlock) contextBlock.style.display = 'block';
+      if (contextEl) contextEl.textContent = entry.contextualDef;
+    } else {
+      if (contextBlock) contextBlock.style.display = 'none';
+    }
+
     if (entry.synonyms && entry.synonyms.length > 0) {
       synBlock.style.display = 'block';
       synList.innerHTML = entry.synonyms.map(s => `<span class="synonym-chip">${s}</span>`).join('');
     } else {
       synBlock.style.display = 'none';
+    }
+
+    if (entry.antonyms && entry.antonyms.length > 0) {
+      if (antBlock) antBlock.style.display = 'block';
+      if (antList) antList.innerHTML = entry.antonyms.map(a => `<span class="antonym-chip">${a}</span>`).join('');
+    } else {
+      if (antBlock) antBlock.style.display = 'none';
     }
 
     if (entry.example) {
@@ -1348,7 +1515,9 @@ async function openDictionaryModal(word) {
     };
   } else {
     defEl.textContent = `A simple definition for "${word}" could not be found.`;
+    if (contextBlock) contextBlock.style.display = 'none';
     synBlock.style.display = 'none';
+    if (antBlock) antBlock.style.display = 'none';
     exBlock.style.display = 'none';
   }
 }

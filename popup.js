@@ -1,7 +1,7 @@
 const DEFAULT_SETTINGS = {
   isActive: true,
   level: 0,
-  font: 'OpenDyslexic',
+  font: 'Lexend',
   fontSize: 100,
   tracking: 0,
   spacing: 0,
@@ -259,9 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentSettings = { ...DEFAULT_SETTINGS };
 
-  // Load saved settings
+  // Load saved settings (persists locally across sessions with storage.local & localStorage)
   chrome.storage.local.get(['va_settings'], (result) => {
-    const raw = result.va_settings || {};
+    let raw = result.va_settings;
+    if (!raw || Object.keys(raw).length === 0) {
+      try {
+        const localRaw = localStorage.getItem('va_settings');
+        if (localRaw) raw = JSON.parse(localRaw);
+      } catch (e) {}
+    }
+    raw = raw || {};
     if (raw.kerning !== undefined && raw.tracking === undefined) {
       raw.tracking = raw.kerning;
       raw.spacing = raw.kerning * 2.5;
@@ -531,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateUI(settings) {
     updateLevelButtons(settings.level || 0);
 
-    fontSelect.value = settings.font || 'OpenDyslexic';
+    fontSelect.value = settings.font || 'Lexend';
     syncFontSizeUI(settings.fontSize || 100);
     fontColorSelect.value = settings.fontColor || 'default';
     contrastModeSelect.value = settings.contrastMode || 'default';
@@ -567,6 +574,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveAndApply(settings) {
     const toSave = { ...settings, tts: true, dictionary: true };
+    try {
+      localStorage.setItem('va_settings', JSON.stringify(toSave));
+    } catch (e) {}
     chrome.storage.local.set({ va_settings: toSave }, () => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {

@@ -32,8 +32,8 @@
           <div class="tool-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
             <label for="reader-font">Typeface</label>
             <select id="reader-font" class="tool-select">
-              <option value="OpenDyslexic">OpenDyslexic</option>
               <option value="Lexend">Lexend</option>
+              <option value="OpenDyslexic">OpenDyslexic</option>
               <option value="'Atkinson Hyperlegible'">Atkinson Hyperlegible</option>
               <option value="Verdana, Geneva, sans-serif">Verdana</option>
               <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
@@ -242,9 +242,17 @@
           <span class="def-label">Simplified Meaning:</span>
           <p id="dict-definition" class="dict-def-text">Definition goes here.</p>
         </div>
+        <div id="dict-context-block" class="context-block" style="display: none;">
+          <span class="def-label">In Context:</span>
+          <p id="dict-context" class="dict-context-text"></p>
+        </div>
         <div id="dict-synonyms-block" class="synonyms-block">
           <span class="def-label">Simpler Everyday Words:</span>
           <div id="dict-synonyms" class="synonyms-list"></div>
+        </div>
+        <div id="dict-antonyms-block" class="antonyms-block" style="display: none;">
+          <span class="def-label">Opposite Words (Antonyms):</span>
+          <div id="dict-antonyms" class="antonyms-list"></div>
         </div>
         <div id="dict-example-block" class="example-block">
           <span class="def-label">Example Sentence:</span>
