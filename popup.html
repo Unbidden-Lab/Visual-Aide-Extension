@@ -276,9 +276,35 @@
             <button type="button" id="tts-voice-test-btn" class="voice-test-btn" title="Preview speech voice" aria-label="Preview speech voice">Test Voice</button>
           </div>
           <select id="tts-voice" class="custom-select">
-            <option value="female">Female (Aria)</option>
-            <option value="male">Male (Guy)</option>
+            <optgroup label="Standard">
+              <option value="female">Aria</option>
+              <option value="male">Guy</option>
+            </optgroup>
+            <optgroup label="Kokoro Studio HD (Offline AI)">
+              <option value="af_heart">af_heart</option>
+              <option value="af_bella">af_bella</option>
+              <option value="am_adam">am_adam</option>
+              <option value="bm_george">bm_george</option>
+            </optgroup>
           </select>
+
+          <!-- Kokoro Studio Model Download / Confirmation Banner -->
+          <div id="kokoro-confirm-banner" class="kokoro-banner hidden" role="region" aria-live="polite">
+            <div class="kokoro-banner-content">
+              <span class="kokoro-banner-title">Kokoro Studio Neural Voice</span>
+              <p id="kokoro-confirm-desc" class="kokoro-banner-desc">Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.</p>
+              <div id="kokoro-progress-container" class="kokoro-progress-container hidden">
+                <div class="kokoro-progress-track">
+                  <div id="kokoro-progress-fill" class="kokoro-progress-fill" style="width: 0%;"></div>
+                </div>
+                <span id="kokoro-progress-text" class="kokoro-progress-text">Downloading... 0%</span>
+              </div>
+              <div id="kokoro-banner-actions" class="kokoro-banner-actions">
+                <button type="button" id="kokoro-confirm-btn" class="kokoro-btn-primary">Download</button>
+                <button type="button" id="kokoro-cancel-btn" class="kokoro-btn-secondary">Cancel</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Speech Speed Multiplier -->
@@ -352,6 +378,7 @@
   <div id="popup-tooltip" class="popup-tooltip" role="tooltip" aria-hidden="true"></div>
 
   <script src="dictionary.js"></script>
+  <script src="kokoro-tts.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

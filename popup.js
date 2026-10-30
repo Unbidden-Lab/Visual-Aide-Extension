@@ -463,26 +463,186 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAndApply(currentSettings);
   });
 
-  // TTS Voice Selector & Sync Storage
-  if (ttsVoiceSelect) {
-    ttsVoiceSelect.addEventListener('change', (e) => {
-      const chosen = e.target.value === 'male' ? 'male' : 'female';
-      currentSettings.ttsVoice = chosen;
-      currentSettings.ttsVoiceGender = chosen;
-      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({ ttsVoice: chosen, ttsVoiceGender: chosen }, () => {
-          if (chrome.runtime && chrome.runtime.lastError) {
-            console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+  // Kokoro Studio Model Download & Confirmation Elements
+  let previousVoice = currentSettings.ttsVoice || 'female';
+  const kokoroBanner = document.getElementById('kokoro-confirm-banner');
+  const kokoroDesc = document.getElementById('kokoro-confirm-desc');
+  const kokoroProgressContainer = document.getElementById('kokoro-progress-container');
+  const kokoroProgressFill = document.getElementById('kokoro-progress-fill');
+  const kokoroProgressText = document.getElementById('kokoro-progress-text');
+  const kokoroActions = document.getElementById('kokoro-banner-actions');
+  const kokoroConfirmBtn = document.getElementById('kokoro-confirm-btn');
+  const kokoroCancelBtn = document.getElementById('kokoro-cancel-btn');
+
+  let pendingKokoroVoice = null;
+
+  function showKokoroBanner(targetVoice) {
+    pendingKokoroVoice = targetVoice;
+    if (kokoroDesc) {
+      kokoroDesc.textContent = 'Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.';
+    }
+    if (kokoroBanner) {
+      kokoroBanner.classList.remove('hidden');
+    }
+    if (kokoroActions) {
+      kokoroActions.classList.remove('hidden');
+    }
+    if (kokoroProgressContainer) {
+      kokoroProgressContainer.classList.add('hidden');
+    }
+    if (kokoroProgressFill) {
+      kokoroProgressFill.style.width = '0%';
+    }
+  }
+
+  function hideKokoroBanner() {
+    if (kokoroBanner) {
+      kokoroBanner.classList.add('hidden');
+    }
+    pendingKokoroVoice = null;
+  }
+
+  function applyVoiceSetting(voiceId) {
+    currentSettings.ttsVoice = voiceId;
+    currentSettings.ttsVoiceGender = (voiceId === 'male' || voiceId === 'am_adam' || voiceId === 'bm_george') ? 'male' : 'female';
+    previousVoice = voiceId;
+    if (ttsVoiceSelect) {
+      ttsVoiceSelect.value = voiceId;
+    }
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      chrome.storage.sync.set({ ttsVoice: voiceId, ttsVoiceGender: currentSettings.ttsVoiceGender }, () => {
+        if (chrome.runtime && chrome.runtime.lastError) {
+          console.warn('Sync storage warning:', chrome.runtime.lastError.message);
+        }
+      });
+    }
+    saveAndApply(currentSettings);
+  }
+
+  if (kokoroCancelBtn) {
+    kokoroCancelBtn.addEventListener('click', () => {
+      hideKokoroBanner();
+      if (ttsVoiceSelect) {
+        ttsVoiceSelect.value = previousVoice;
+      }
+    });
+  }
+
+  if (kokoroConfirmBtn) {
+    kokoroConfirmBtn.addEventListener('click', async () => {
+      if (kokoroActions) kokoroActions.classList.add('hidden');
+      if (kokoroProgressContainer) kokoroProgressContainer.classList.remove('hidden');
+      if (kokoroProgressText) kokoroProgressText.textContent = 'Connecting to model repository...';
+
+      try {
+        await loadKokoroModel((info) => {
+          if (!info) return;
+          let pct = 0;
+          if (typeof info.progress === 'number') {
+            pct = Math.min(100, Math.max(0, Math.round(info.progress)));
+          } else if (info.loaded && info.total) {
+            pct = Math.min(100, Math.max(0, Math.round((info.loaded / info.total) * 100)));
+          }
+
+          if (kokoroProgressFill) {
+            kokoroProgressFill.style.width = `${pct}%`;
+          }
+
+          if (kokoroProgressText) {
+            if (info.status === 'initiate') {
+              kokoroProgressText.textContent = 'Connecting to model repository...';
+            } else if (info.status === 'progress' || info.status === 'download') {
+              kokoroProgressText.textContent = `Downloading Kokoro Studio Model... ${pct}%`;
+            } else if (info.status === 'done') {
+              kokoroProgressText.textContent = 'Model download complete. Initializing...';
+            } else if (info.status === 'ready') {
+              kokoroProgressText.textContent = 'Kokoro Studio Ready!';
+            }
           }
         });
+
+        if (kokoroProgressFill) kokoroProgressFill.style.width = '100%';
+        if (kokoroProgressText) kokoroProgressText.textContent = 'Kokoro Studio Ready!';
+
+        setTimeout(() => {
+          hideKokoroBanner();
+        }, 1200);
+
+        applyVoiceSetting(pendingKokoroVoice || 'af_heart');
+      } catch (err) {
+        console.error('Kokoro download error:', err);
+        if (kokoroProgressText) {
+          kokoroProgressText.textContent = 'Download failed. Please check internet connection.';
+        }
+        setTimeout(() => {
+          hideKokoroBanner();
+          if (ttsVoiceSelect) {
+            ttsVoiceSelect.value = previousVoice;
+          }
+        }, 2200);
       }
-      saveAndApply(currentSettings);
+    });
+  }
+
+  // TTS Voice Selector & Sync Storage
+  if (ttsVoiceSelect) {
+    ttsVoiceSelect.addEventListener('change', async (e) => {
+      const chosen = e.target.value;
+
+      if (isKokoroVoice(chosen)) {
+        const cached = await isKokoroModelCached();
+        if (!cached) {
+          showKokoroBanner(chosen);
+          return;
+        }
+      }
+
+      applyVoiceSetting(chosen);
     });
   }
 
   // TTS Voice Preview Test Button
   if (ttsVoiceTestBtn) {
     ttsVoiceTestBtn.addEventListener('click', async () => {
+      const chosenVoice = currentSettings.ttsVoice || 'female';
+      const speedVal = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
+
+      // 1. Kokoro Studio voice active
+      if (isKokoroVoice(chosenVoice)) {
+        if (isKokoroAudioPlaying()) {
+          stopKokoroAudio();
+          ttsVoiceTestBtn.textContent = 'Test Voice';
+          return;
+        }
+
+        ttsVoiceTestBtn.textContent = 'Generating...';
+        try {
+          const text = (chosenVoice === 'am_adam' || chosenVoice === 'bm_george')
+            ? 'Hello, this is Adam reading aloud with Visual Aide.'
+            : 'Hello, this is Heart reading aloud with Visual Aide.';
+
+          await playKokoroAudio(text, {
+            voice: chosenVoice,
+            speed: speedVal,
+            onStart: () => {
+              ttsVoiceTestBtn.textContent = 'Stop';
+            },
+            onEnd: () => {
+              ttsVoiceTestBtn.textContent = 'Test Voice';
+            },
+            onError: (err) => {
+              console.warn('Kokoro test audio error:', err);
+              ttsVoiceTestBtn.textContent = 'Test Voice';
+            }
+          });
+        } catch (err) {
+          console.warn('Kokoro test voice failure:', err);
+          ttsVoiceTestBtn.textContent = 'Test Voice';
+        }
+        return;
+      }
+
+      // 2. Standard Web SpeechSynthesis voice active
       if (!window.speechSynthesis) return;
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -496,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const preferred = getResolvedVoice(voices, gender);
 
       const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = parseFloat(currentSettings.ttsSpeed || 1.0);
+      utter.rate = speedVal;
       if (preferred) {
         utter.voice = preferred;
         utter.lang = preferred.lang || 'en-US';
@@ -851,15 +1011,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (speakBtn) {
       speakBtn.addEventListener('click', async () => {
-        if (!activeWord || typeof window === 'undefined' || !window.speechSynthesis) return;
+        if (!activeWord) return;
+        const currentVoice = currentSettings.ttsVoice || 'female';
+        const speedVal = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
+
+        if (isKokoroVoice(currentVoice)) {
+          try {
+            speakBtn.textContent = '...';
+            await playKokoroAudio(activeWord, {
+              voice: currentVoice,
+              speed: speedVal,
+              onEnd: () => {
+                speakBtn.textContent = 'Listen';
+              },
+              onError: () => {
+                speakBtn.textContent = 'Listen';
+              }
+            });
+            speakBtn.textContent = 'Listen';
+          } catch (e) {
+            speakBtn.textContent = 'Listen';
+            console.warn('Kokoro pronunciation error:', e);
+          }
+          return;
+        }
+
+        if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
         window.speechSynthesis.cancel();
         const voices = await getVoicesAsync();
-        const selectedGender = (currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female').toLowerCase();
-        const preferredVoice = getResolvedVoice(voices, selectedGender);
+        const preferredVoice = getResolvedVoice(voices, currentVoice);
 
         const u = new SpeechSynthesisUtterance(activeWord);
-        u.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
+        u.rate = speedVal;
         u.lang = preferredVoice && preferredVoice.lang ? preferredVoice.lang : (navigator.language || 'en-US');
         if (preferredVoice) {
           u.voice = preferredVoice;

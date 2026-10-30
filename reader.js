@@ -310,7 +310,7 @@ function initSettingsSync() {
     if (s.contrast) currentReaderSettings.contrast = s.contrast;
     if (s.bionic !== undefined) currentReaderSettings.bionic = s.bionic;
     if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
-    if (s.ttsVoice && !currentReaderSettings.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
+    if (s.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
     if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
     applyAllReaderStyles();
     updateToolbarUI();
@@ -531,11 +531,119 @@ function initToolbarControls() {
   document.getElementById('reader-tts-play').addEventListener('click', handleTtsPlay);
   document.getElementById('reader-tts-stop').addEventListener('click', handleTtsStop);
 
-  // TTS Voice selector
+  // TTS Voice selector & Kokoro Studio Modal
   const voiceSelect = document.getElementById('reader-tts-voice');
+  let previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
+
+  const readerKokoroModal = document.getElementById('reader-kokoro-modal');
+  const readerKokoroProgressContainer = document.getElementById('reader-kokoro-progress-container');
+  const readerKokoroProgressFill = document.getElementById('reader-kokoro-progress-fill');
+  const readerKokoroProgressText = document.getElementById('reader-kokoro-progress-text');
+  const readerKokoroActions = document.getElementById('reader-kokoro-actions');
+  const readerKokoroConfirmBtn = document.getElementById('reader-kokoro-confirm-btn');
+  const readerKokoroCancelBtn = document.getElementById('reader-kokoro-cancel-btn');
+  const readerKokoroBackdrop = document.getElementById('reader-kokoro-backdrop');
+
+  let pendingReaderKokoroVoice = null;
+
+  function showReaderKokoroModal(targetVoice) {
+    pendingReaderKokoroVoice = targetVoice;
+    if (readerKokoroModal) readerKokoroModal.classList.remove('hidden');
+    if (readerKokoroActions) readerKokoroActions.classList.remove('hidden');
+    if (readerKokoroProgressContainer) readerKokoroProgressContainer.classList.add('hidden');
+    if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '0%';
+  }
+
+  function hideReaderKokoroModal() {
+    if (readerKokoroModal) readerKokoroModal.classList.add('hidden');
+    pendingReaderKokoroVoice = null;
+  }
+
+  if (readerKokoroCancelBtn) {
+    readerKokoroCancelBtn.addEventListener('click', () => {
+      hideReaderKokoroModal();
+      if (voiceSelect) voiceSelect.value = previousReaderVoice;
+    });
+  }
+
+  if (readerKokoroBackdrop) {
+    readerKokoroBackdrop.addEventListener('click', () => {
+      hideReaderKokoroModal();
+      if (voiceSelect) voiceSelect.value = previousReaderVoice;
+    });
+  }
+
+  if (readerKokoroConfirmBtn) {
+    readerKokoroConfirmBtn.addEventListener('click', async () => {
+      if (readerKokoroActions) readerKokoroActions.classList.add('hidden');
+      if (readerKokoroProgressContainer) readerKokoroProgressContainer.classList.remove('hidden');
+      if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Connecting to model repository...';
+
+      try {
+        await loadKokoroModel((info) => {
+          if (!info) return;
+          let pct = 0;
+          if (typeof info.progress === 'number') {
+            pct = Math.min(100, Math.max(0, Math.round(info.progress)));
+          } else if (info.loaded && info.total) {
+            pct = Math.min(100, Math.max(0, Math.round((info.loaded / info.total) * 100)));
+          }
+
+          if (readerKokoroProgressFill) {
+            readerKokoroProgressFill.style.width = `${pct}%`;
+          }
+
+          if (readerKokoroProgressText) {
+            if (info.status === 'initiate') {
+              readerKokoroProgressText.textContent = 'Connecting to model repository...';
+            } else if (info.status === 'progress' || info.status === 'download') {
+              readerKokoroProgressText.textContent = `Downloading Kokoro Studio Model... ${pct}%`;
+            } else if (info.status === 'done') {
+              readerKokoroProgressText.textContent = 'Model download complete. Initializing...';
+            } else if (info.status === 'ready') {
+              readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
+            }
+          }
+        });
+
+        if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '100%';
+        if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
+
+        setTimeout(() => {
+          hideReaderKokoroModal();
+        }, 1200);
+
+        const chosenVoice = pendingReaderKokoroVoice || 'af_heart';
+        currentReaderSettings.ttsVoice = chosenVoice;
+        previousReaderVoice = chosenVoice;
+        if (voiceSelect) voiceSelect.value = chosenVoice;
+        saveReaderSettings();
+      } catch (err) {
+        console.error('Reader Kokoro download error:', err);
+        if (readerKokoroProgressText) {
+          readerKokoroProgressText.textContent = 'Download failed. Please check internet connection.';
+        }
+        setTimeout(() => {
+          hideReaderKokoroModal();
+          if (voiceSelect) voiceSelect.value = previousReaderVoice;
+        }, 2200);
+      }
+    });
+  }
+
   if (voiceSelect) {
-    voiceSelect.addEventListener('change', (e) => {
-      currentReaderSettings.ttsVoice = e.target.value;
+    voiceSelect.addEventListener('change', async (e) => {
+      const chosen = e.target.value;
+      if (isKokoroVoice(chosen)) {
+        const cached = await isKokoroModelCached();
+        if (!cached) {
+          showReaderKokoroModal(chosen);
+          return;
+        }
+      }
+
+      currentReaderSettings.ttsVoice = chosen;
+      previousReaderVoice = chosen;
       saveReaderSettings();
     });
   }
@@ -1260,7 +1368,7 @@ function stopReaderTtsHeartbeat() {
 }
 
 async function playNextReaderTtsChunk() {
-  if (!window.speechSynthesis || readerTtsIndex >= readerTtsQueue.length) {
+  if (readerTtsIndex >= readerTtsQueue.length) {
     handleTtsStop();
     return;
   }
@@ -1272,16 +1380,50 @@ async function playNextReaderTtsChunk() {
     return;
   }
 
-  // Ensure neural/natural voices are loaded before speaking chunk
+  const activeVoice = currentReaderSettings.ttsVoice || 'female';
+  const speedVal = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
+
+  // 1. Route to Kokoro Studio Neural Engine
+  if (isKokoroVoice(activeVoice)) {
+    updateReaderTtsUi(true);
+    try {
+      await playKokoroAudio(chunk, {
+        voice: activeVoice,
+        speed: speedVal,
+        onEnd: () => {
+          if (readerTtsQueue.length === 0) return;
+          readerTtsIndex++;
+          playNextReaderTtsChunk();
+        },
+        onError: (err) => {
+          console.warn('Reader Kokoro chunk error:', err);
+          if (readerTtsQueue.length === 0) return;
+          readerTtsIndex++;
+          playNextReaderTtsChunk();
+        }
+      });
+    } catch (err) {
+      console.error('Kokoro synthesis error:', err);
+      handleTtsStop();
+    }
+    return;
+  }
+
+  // 2. Route to Standard Web SpeechSynthesis
+  if (!window.speechSynthesis) {
+    handleTtsStop();
+    return;
+  }
+
   const voices = await getVoicesAsync();
   if (readerTtsQueue.length === 0 || readerTtsIndex >= readerTtsQueue.length) {
     return;
   }
 
   ttsUtterance = new SpeechSynthesisUtterance(chunk);
-  ttsUtterance.rate = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
+  ttsUtterance.rate = speedVal;
 
-  const preferredVoice = getResolvedVoice(voices, currentReaderSettings.ttsVoice || 'female');
+  const preferredVoice = getResolvedVoice(voices, activeVoice);
   if (preferredVoice) {
     ttsUtterance.voice = preferredVoice;
     ttsUtterance.lang = preferredVoice.lang || 'en-US';
@@ -1289,7 +1431,6 @@ async function playNextReaderTtsChunk() {
     ttsUtterance.lang = navigator.language || 'en-US';
   }
 
-  // Prevent Chromium garbage-collection bug while utterance is speaking
   activeReaderUtterances.add(ttsUtterance);
   readerChunkStartTime = Date.now();
 
@@ -1301,14 +1442,10 @@ async function playNextReaderTtsChunk() {
 
   ttsUtterance.onerror = (err) => {
     activeReaderUtterances.delete(ttsUtterance);
-
-    // Canceled or interrupted events are normal lifecycle results of user actions (Stop, Prev/Next page)
     if (err.error === 'canceled' || err.error === 'interrupted') {
       return;
     }
-
     console.warn('Reader TTS chunk skipped due to synthesis issue:', err.error || err);
-    // Move to next chunk rather than terminating entire playback
     readerTtsIndex++;
     playNextReaderTtsChunk();
   };
@@ -1318,16 +1455,53 @@ async function playNextReaderTtsChunk() {
 }
 
 function handleTtsPlay() {
+  const activeVoice = currentReaderSettings.ttsVoice || 'female';
+
+  // Kokoro playback controls (Play / Pause / Resume)
+  if (isKokoroVoice(activeVoice)) {
+    if (isKokoroAudioPaused() && readerTtsQueue.length > 0) {
+      resumeKokoroAudio();
+      updateReaderTtsUi(true);
+      return;
+    }
+
+    const selection = window.getSelection().toString().trim();
+    if (isKokoroAudioPlaying() && readerTtsQueue.length > 0 && !selection) {
+      pauseKokoroAudio();
+      updateReaderTtsUi(false);
+      return;
+    }
+
+    let textToRead = selection;
+    if (!textToRead) {
+      const pageEl = document.querySelector('.reader-document .reader-page');
+      if (pageEl) {
+        const paragraphs = Array.from(pageEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(Boolean);
+        textToRead = paragraphs.join('\n\n') || pageEl.innerText;
+      }
+    }
+
+    if (!textToRead) return;
+
+    const chunks = chunkReaderTtsText(textToRead);
+    if (chunks.length === 0) return;
+
+    handleTtsStop();
+    readerTtsQueue = chunks;
+    readerTtsIndex = 0;
+    playNextReaderTtsChunk();
+    return;
+  }
+
+  // Standard Web SpeechSynthesis playback controls
   if (!window.speechSynthesis) return;
 
-  // If currently paused, resume playback
   if (window.speechSynthesis.paused && readerTtsQueue.length > 0) {
     window.speechSynthesis.resume();
     updateReaderTtsUi(true);
     return;
   }
 
-  // If already speaking and user clicks play without a new selection, toggle pause
   const selection = window.getSelection().toString().trim();
   if (window.speechSynthesis.speaking && readerTtsQueue.length > 0 && !selection) {
     window.speechSynthesis.pause();
@@ -1349,9 +1523,7 @@ function handleTtsPlay() {
   const chunks = chunkReaderTtsText(textToRead);
   if (chunks.length === 0) return;
 
-  // Reset any active speech cleanly and wait for Chrome IPC to clear before speaking
-  window.speechSynthesis.cancel();
-  activeReaderUtterances.clear();
+  handleTtsStop();
   readerTtsQueue = chunks;
   readerTtsIndex = 0;
 
@@ -1364,6 +1536,9 @@ function handleTtsPlay() {
 function handleTtsStop() {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
+  }
+  if (typeof stopKokoroAudio === 'function') {
+    stopKokoroAudio();
   }
   activeReaderUtterances.clear();
   stopReaderTtsHeartbeat();
@@ -1494,17 +1669,40 @@ async function openDictionaryModal(word) {
       exBlock.style.display = 'none';
     }
 
-    ttsBtn.onclick = () => {
+    ttsBtn.onclick = async () => {
+      const activeVoice = currentReaderSettings.ttsVoice || 'female';
+      const speedVal = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
+
+      if (isKokoroVoice(activeVoice)) {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        stopKokoroAudio();
+        updateReaderTtsUi(false);
+        try {
+          ttsBtn.textContent = '...';
+          await playKokoroAudio(entry.word, {
+            voice: activeVoice,
+            speed: speedVal,
+            onEnd: () => { ttsBtn.textContent = 'Listen'; },
+            onError: () => { ttsBtn.textContent = 'Listen'; }
+          });
+          ttsBtn.textContent = 'Listen';
+        } catch (e) {
+          ttsBtn.textContent = 'Listen';
+          console.warn('Kokoro dictionary speech error:', e);
+        }
+        return;
+      }
+
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
         activeReaderUtterances.clear();
         updateReaderTtsUi(false);
         setTimeout(() => {
           const u = new SpeechSynthesisUtterance(entry.word);
-          u.rate = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
+          u.rate = speedVal;
           u.lang = navigator.language || 'en-US';
           const voices = window.speechSynthesis.getVoices();
-          const preferredVoice = getResolvedVoice(voices, currentReaderSettings.ttsVoice || 'female');
+          const preferredVoice = getResolvedVoice(voices, activeVoice);
           if (preferredVoice) {
             u.voice = preferredVoice;
             if (preferredVoice.lang) u.lang = preferredVoice.lang;

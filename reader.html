@@ -140,8 +140,16 @@
           <div class="tool-item" data-tooltip-title="TTS Voice" data-tooltip-desc="Choose female (Aria) or male (Guy) natural neural voice for reading aloud">
             <label for="reader-tts-voice">Voice</label>
             <select id="reader-tts-voice" class="tool-select">
-              <option value="female">Female (Aria)</option>
-              <option value="male">Male (Guy)</option>
+              <optgroup label="Standard">
+                <option value="female">Aria</option>
+                <option value="male">Guy</option>
+              </optgroup>
+              <optgroup label="Kokoro Studio HD (Offline AI)">
+                <option value="af_heart">af_heart</option>
+                <option value="af_bella">af_bella</option>
+                <option value="am_adam">am_adam</option>
+                <option value="bm_george">bm_george</option>
+              </optgroup>
             </select>
           </div>
 
@@ -262,10 +270,32 @@
     </div>
   </div>
 
+  <!-- Kokoro Studio Download Modal in Reader -->
+  <div id="reader-kokoro-modal" class="reader-kokoro-modal hidden" role="dialog" aria-modal="true" aria-labelledby="reader-kokoro-title">
+    <div class="reader-kokoro-backdrop" id="reader-kokoro-backdrop"></div>
+    <div class="reader-kokoro-card">
+      <div class="reader-kokoro-header">
+        <h3 id="reader-kokoro-title" class="reader-kokoro-title">Kokoro Studio Neural Voice</h3>
+      </div>
+      <p id="reader-kokoro-desc" class="reader-kokoro-desc">Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.</p>
+      <div id="reader-kokoro-progress-container" class="kokoro-progress-container hidden">
+        <div class="kokoro-progress-track">
+          <div id="reader-kokoro-progress-fill" class="kokoro-progress-fill" style="width: 0%;"></div>
+        </div>
+        <span id="reader-kokoro-progress-text" class="kokoro-progress-text">Downloading... 0%</span>
+      </div>
+      <div id="reader-kokoro-actions" class="reader-kokoro-actions">
+        <button type="button" id="reader-kokoro-confirm-btn" class="tool-btn highlight">Download</button>
+        <button type="button" id="reader-kokoro-cancel-btn" class="tool-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- External & Local Scripts -->
   <script src="lib/pdf.min.js"></script>
   <script src="lib/pdf.worker.min.js"></script>
   <script src="dictionary.js"></script>
+  <script src="kokoro-tts.js"></script>
   <script src="reader.js"></script>
 </body>
 </html>
