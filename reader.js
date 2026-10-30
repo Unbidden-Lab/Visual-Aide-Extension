@@ -40,7 +40,7 @@ When reading conventional print, individuals with dyslexia or Meares-Irlen syndr
 Double-click on any word (such as *aberration*, *alleviate*, *ambiguous*, *comprehensive*, *pervasive*, *meticulous*, *ubiquitous*) to test the instant Simplified Dictionary!
 `;
 
-let currentReaderSettings = {
+const DEFAULT_READER_SETTINGS = {
   font: 'Lexend',
   fontSize: 18,
   tracking: 0,
@@ -54,6 +54,8 @@ let currentReaderSettings = {
   ttsSpeed: 1.0,
   ttsEngineTier: 'wasm'
 };
+
+let currentReaderSettings = { ...DEFAULT_READER_SETTINGS };
 
 // -------------------------------------------------------------
 // Natural Neural Voice Matcher (Aria for Female, Guy for Male)
@@ -273,35 +275,9 @@ function initNetworkStatus() {
 }
 
 // -------------------------------------------------------------
-// Settings Initialization & Sync with Extension
+// Settings Initialization & Isolated Reader Persistence
 // -------------------------------------------------------------
 function initSettingsSync() {
-  // Query sync storage for voice, speed, and tier selection
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], (syncRes) => {
-      const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
-      if (syncVoice) {
-        currentReaderSettings.ttsVoice = syncVoice;
-        const voiceSelect = document.getElementById('reader-tts-voice');
-        if (voiceSelect) voiceSelect.value = syncVoice;
-      }
-      const syncSpeed = syncRes?.ttsSpeed ?? syncRes?.ttsRate;
-      if (syncSpeed !== undefined && syncSpeed !== null) {
-        currentReaderSettings.ttsSpeed = parseFloat(syncSpeed);
-        const speedSelect = document.getElementById('reader-tts-speed');
-        if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
-      }
-      const syncTier = syncRes?.ttsEngineTier || 'wasm';
-      currentReaderSettings.ttsEngineTier = syncTier;
-      const tierSelect = document.getElementById('reader-tts-engine-tier');
-      if (tierSelect) tierSelect.value = syncTier;
-      previousReaderTier = syncTier;
-      previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
-      updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice);
-      checkReaderGpuAdmission();
-    });
-  }
-
   const applyStoredSettings = (s) => {
     if (!s) return;
     if (s.font) currentReaderSettings.font = s.font;
@@ -322,62 +298,35 @@ function initSettingsSync() {
     if (s.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
     if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
     if (s.ttsEngineTier) currentReaderSettings.ttsEngineTier = s.ttsEngineTier;
+
+    previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
+    previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
+    updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice);
+    checkReaderGpuAdmission();
     applyAllReaderStyles();
     updateToolbarUI();
   };
 
-  // Immediate local cache retrieval (persists across sessions locally)
+  // Immediate local cache retrieval (persists across sessions locally via localStorage)
   try {
     const localReader = localStorage.getItem('va_reader_settings');
-    if (localReader) applyStoredSettings(JSON.parse(localReader));
-    else {
-      const localMain = localStorage.getItem('va_settings');
-      if (localMain) applyStoredSettings(JSON.parse(localMain));
+    if (localReader) {
+      applyStoredSettings(JSON.parse(localReader));
     }
   } catch (e) {}
 
+  // Asynchronous chrome.storage.local retrieval (strictly isolated from va_settings)
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['va_settings', 'va_reader_settings'], (result) => {
-      const s = result.va_reader_settings || result.va_settings;
-      if (s) {
-        applyStoredSettings(s);
+    chrome.storage.local.get(['va_reader_settings'], (result) => {
+      if (result.va_reader_settings) {
+        applyStoredSettings(result.va_reader_settings);
       }
     });
 
     if (chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'sync') {
-          if (changes.ttsVoice || changes.ttsVoiceGender) {
-            const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
-            if (syncVoice) {
-              currentReaderSettings.ttsVoice = syncVoice;
-              previousReaderVoice = syncVoice;
-              const voiceSelect = document.getElementById('reader-tts-voice');
-              if (voiceSelect) voiceSelect.value = syncVoice;
-              updateReaderNeuralTierVisibility(syncVoice);
-            }
-          }
-          if (changes.ttsSpeed || changes.ttsRate) {
-            const syncSpeed = changes.ttsSpeed?.newValue ?? changes.ttsRate?.newValue;
-            if (syncSpeed !== undefined && syncSpeed !== null) {
-              currentReaderSettings.ttsSpeed = parseFloat(syncSpeed);
-              const speedSelect = document.getElementById('reader-tts-speed');
-              if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
-            }
-          }
-          if (changes.ttsEngineTier) {
-            const syncTier = changes.ttsEngineTier?.newValue || 'wasm';
-            currentReaderSettings.ttsEngineTier = syncTier;
-            const tierSelect = document.getElementById('reader-tts-engine-tier');
-            if (tierSelect) tierSelect.value = syncTier;
-          }
-        }
-        if (area === 'local') {
-          if (changes.va_reader_settings && changes.va_reader_settings.newValue) {
-            applyStoredSettings(changes.va_reader_settings.newValue);
-          } else if (changes.va_settings && changes.va_settings.newValue) {
-            applyStoredSettings(changes.va_settings.newValue);
-          }
+        if (area === 'local' && changes.va_reader_settings && changes.va_reader_settings.newValue) {
+          applyStoredSettings(changes.va_reader_settings.newValue);
         }
       });
     }
@@ -393,49 +342,11 @@ function saveReaderSettings() {
     localStorage.setItem('va_reader_settings', JSON.stringify(currentReaderSettings));
   } catch (e) {}
 
-  if (typeof chrome !== 'undefined' && chrome.storage) {
-    // Save voice, speed, and tier to sync storage
-    if (chrome.storage.sync) {
-      chrome.storage.sync.set({
-        ttsVoice: currentReaderSettings.ttsVoice || 'female',
-        ttsVoiceGender: currentReaderSettings.ttsVoice || 'female',
-        ttsSpeed: currentReaderSettings.ttsSpeed || 1.0,
-        ttsRate: currentReaderSettings.ttsSpeed || 1.0,
-        ttsEngineTier: currentReaderSettings.ttsEngineTier || 'wasm'
-      }, () => {
-        if (chrome.runtime && chrome.runtime.lastError) {
-          console.warn('Sync storage warning:', chrome.runtime.lastError.message);
-        }
-      });
-    }
-
-    if (chrome.storage.local) {
-      chrome.storage.local.get(['va_settings'], (result) => {
-        const existing = result.va_settings || {};
-        existing.font = currentReaderSettings.font;
-        existing.fontSize = currentReaderSettings.fontSize;
-        existing.readerFontSize = currentReaderSettings.fontSize;
-        existing.tracking = currentReaderSettings.tracking;
-        existing.spacing = currentReaderSettings.spacing;
-        existing.leading = currentReaderSettings.leading;
-        existing.fontColor = currentReaderSettings.fontColor;
-        existing.contrastMode = currentReaderSettings.contrast;
-        existing.bionic = currentReaderSettings.bionic;
-        existing.ruler = currentReaderSettings.ruler;
-        existing.ttsVoice = currentReaderSettings.ttsVoice || 'female';
-        existing.ttsVoiceGender = currentReaderSettings.ttsVoice || 'female';
-        existing.ttsSpeed = currentReaderSettings.ttsSpeed || 1.0;
-        existing.ttsRate = currentReaderSettings.ttsSpeed || 1.0;
-        existing.ttsEngineTier = currentReaderSettings.ttsEngineTier || 'wasm';
-        try {
-          localStorage.setItem('va_settings', JSON.stringify(existing));
-        } catch (e) {}
-        chrome.storage.local.set({
-          va_settings: existing,
-          va_reader_settings: currentReaderSettings
-        });
-      });
-    }
+  // Persist locally across sessions via chrome.storage.local (isolated key)
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.set({
+      va_reader_settings: currentReaderSettings
+    });
   }
 }
 

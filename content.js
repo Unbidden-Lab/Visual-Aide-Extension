@@ -1741,6 +1741,14 @@ function applyAll(settings) {
     settings.spacing = settings.kerning * 2.5;
   }
 
+  // Ensure invalid or leaked font size (< 50% or > 250%) does not break page scale
+  if (settings.fontSize !== undefined) {
+    const parsedSize = parseInt(settings.fontSize, 10);
+    if (isNaN(parsedSize) || parsedSize < 50 || parsedSize > 250) {
+      settings.fontSize = 100;
+    }
+  }
+
   currentSettings = { ...currentSettings, ...settings, tts: true, dictionary: true };
   setupStyleBlock();
 }

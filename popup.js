@@ -275,6 +275,16 @@ document.addEventListener('DOMContentLoaded', () => {
       raw.tracking = raw.kerning;
       raw.spacing = raw.kerning * 2.5;
     }
+    // Clean up any leaked reader settings or invalid font sizes (< 50% or > 250%)
+    if (raw.readerFontSize !== undefined) {
+      delete raw.readerFontSize;
+    }
+    if (raw.fontSize !== undefined) {
+      const parsedSize = parseInt(raw.fontSize, 10);
+      if (isNaN(parsedSize) || parsedSize < 50 || parsedSize > 250) {
+        raw.fontSize = DEFAULT_SETTINGS.fontSize; // 100%
+      }
+    }
     currentSettings = { ...DEFAULT_SETTINGS, ...raw, tts: true, dictionary: true };
 
     // Load persisted voice and speed multiplier from sync storage
@@ -945,6 +955,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveAndApply(settings) {
     const toSave = { ...settings, tts: true, dictionary: true };
+    if (toSave.readerFontSize !== undefined) {
+      delete toSave.readerFontSize;
+    }
+    if (toSave.fontSize !== undefined) {
+      const parsedSize = parseInt(toSave.fontSize, 10);
+      if (isNaN(parsedSize) || parsedSize < 50 || parsedSize > 250) {
+        toSave.fontSize = DEFAULT_SETTINGS.fontSize;
+      }
+    }
     try {
       localStorage.setItem('va_settings', JSON.stringify(toSave));
     } catch (e) {}
@@ -1000,6 +1019,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
       const fresh = { ...DEFAULT_SETTINGS, ...changes.va_settings.newValue, tts: true, dictionary: true };
+      if (fresh.readerFontSize !== undefined) {
+        delete fresh.readerFontSize;
+      }
+      if (fresh.fontSize !== undefined) {
+        const parsedSize = parseInt(fresh.fontSize, 10);
+        if (isNaN(parsedSize) || parsedSize < 50 || parsedSize > 250) {
+          fresh.fontSize = DEFAULT_SETTINGS.fontSize;
+        }
+      }
       currentSettings = fresh;
       masterToggle.checked = fresh.isActive !== false;
       updateToggleUI(masterToggle.checked);
