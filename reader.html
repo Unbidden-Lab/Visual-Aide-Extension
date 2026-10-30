@@ -193,7 +193,39 @@
               <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
             </div>
           </div>
-        </div>      </div>
+        </div>
+
+        <!-- Group 5: Paper Dimensions & Print Setup -->
+        <div class="tool-group" id="reader-print-setup-group">
+          <!-- Paper Size Preset -->
+          <div class="tool-item" data-tooltip-title="Paper Size" data-tooltip-desc="Choose paper dimensions for printing and PDF export (Letter, A4, Folio, Legal, or Custom)">
+            <label for="reader-paper-size">Paper Size</label>
+            <select id="reader-paper-size" class="tool-select">
+              <option value="letter">Standard Letter (8.5" x 11")</option>
+              <option value="a4">A4 (210mm x 297mm)</option>
+              <option value="folio">Philippine Long / Folio (8.5" x 13")</option>
+              <option value="legal">US Legal (8.5" x 14")</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <!-- Custom Paper Dimensions (Width & Height in inches) -->
+          <div class="tool-item custom-paper-item hidden" id="reader-custom-paper-group" style="display: none;" data-tooltip-title="Custom Dimensions" data-tooltip-desc="Enter custom paper width and height in inches">
+            <label>Dimensions</label>
+            <div class="custom-paper-fields">
+              <div class="paper-dim-field">
+                <label for="reader-custom-paper-width">W</label>
+                <input type="number" id="reader-custom-paper-width" class="paper-dim-input" value="8.5" min="2" max="40" step="0.1" aria-label="Custom paper width in inches">
+              </div>
+              <span class="paper-dim-times">&times;</span>
+              <div class="paper-dim-field">
+                <label for="reader-custom-paper-height">H</label>
+                <input type="number" id="reader-custom-paper-height" class="paper-dim-input" value="11" min="2" max="60" step="0.1" aria-label="Custom paper height in inches">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 

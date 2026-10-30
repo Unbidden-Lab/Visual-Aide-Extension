@@ -54,7 +54,10 @@ const DEFAULT_READER_SETTINGS = {
   ruler: false,
   ttsVoice: 'female',
   ttsSpeed: 1.0,
-  ttsEngineTier: 'wasm'
+  ttsEngineTier: 'wasm',
+  paperSize: 'letter',
+  customPaperWidth: 8.5,
+  customPaperHeight: 11
 };
 
 let currentReaderSettings = { ...DEFAULT_READER_SETTINGS };
@@ -304,6 +307,9 @@ function initSettingsSync() {
     if (s.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
     if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
     if (s.ttsEngineTier) currentReaderSettings.ttsEngineTier = s.ttsEngineTier;
+    if (s.paperSize) currentReaderSettings.paperSize = s.paperSize;
+    if (s.customPaperWidth !== undefined) currentReaderSettings.customPaperWidth = parseFloat(s.customPaperWidth) || 8.5;
+    if (s.customPaperHeight !== undefined) currentReaderSettings.customPaperHeight = parseFloat(s.customPaperHeight) || 11;
 
     previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
     previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
@@ -454,9 +460,77 @@ function initToolbarControls() {
     saveReaderSettings();
   });
 
-  // Print
-  document.getElementById('print-btn').addEventListener('click', () => {
-    window.print();
+  // Paper Size & Print Dimensions Setup
+  const paperSizeSelect = document.getElementById('reader-paper-size');
+  const customPaperGroupEl = document.getElementById('reader-custom-paper-group');
+  const customWidthInput = document.getElementById('reader-custom-paper-width');
+  const customHeightInput = document.getElementById('reader-custom-paper-height');
+
+  if (paperSizeSelect) {
+    paperSizeSelect.addEventListener('change', (e) => {
+      const chosen = e.target.value;
+      currentReaderSettings.paperSize = chosen;
+      if (customPaperGroupEl) {
+        const isCustom = chosen === 'custom';
+        customPaperGroupEl.style.display = isCustom ? 'flex' : 'none';
+        customPaperGroupEl.classList.toggle('hidden', !isCustom);
+      }
+      preparePrintStylesheet();
+      saveReaderSettings();
+    });
+  }
+
+  if (customWidthInput) {
+    customWidthInput.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        currentReaderSettings.customPaperWidth = val;
+        preparePrintStylesheet();
+        saveReaderSettings();
+      }
+    });
+  }
+
+  if (customHeightInput) {
+    customHeightInput.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        currentReaderSettings.customPaperHeight = val;
+        preparePrintStylesheet();
+        saveReaderSettings();
+      }
+    });
+  }
+
+  // Print Document Handler with Dynamic Paper Size & Multi-Page Support
+  const printBtn = document.getElementById('print-btn');
+  if (printBtn) {
+    printBtn.addEventListener('click', async () => {
+      preparePrintStylesheet();
+      const isMultiPage = currentPdfDocument && currentTotalPages > 1;
+      if (isMultiPage) {
+        showReaderLoading('Preparing document pages for printing...');
+        await ensureAllPagesLoaded();
+        hideReaderLoading();
+        renderAllPagesForPrint();
+      }
+      window.print();
+      if (isMultiPage) {
+        restoreAfterPrint();
+      }
+    });
+  }
+
+  window.addEventListener('beforeprint', async () => {
+    preparePrintStylesheet();
+    if (currentPdfDocument && currentTotalPages > 1) {
+      await ensureAllPagesLoaded();
+      renderAllPagesForPrint();
+    }
+  });
+
+  window.addEventListener('afterprint', () => {
+    restoreAfterPrint();
   });
 
   // Open file button in header
@@ -772,6 +846,242 @@ async function checkReaderGpuAdmission() {
   }
 }
 
+// -------------------------------------------------------------
+// Dynamic Paper Dimensions & Print Formatting Helpers
+// -------------------------------------------------------------
+const PAPER_PRESETS = {
+  letter: { name: 'Standard Letter', size: '8.5in 11in', widthIn: 8.5, heightIn: 11 },
+  a4: { name: 'A4', size: '210mm 297mm', widthIn: 8.27, heightIn: 11.69 },
+  folio: { name: 'Philippine Long / Folio', size: '8.5in 13in', widthIn: 8.5, heightIn: 13 },
+  legal: { name: 'US Legal', size: '8.5in 14in', widthIn: 8.5, heightIn: 14 }
+};
+
+function getPrintPageSize() {
+  const presetKey = currentReaderSettings.paperSize || 'letter';
+  if (presetKey === 'custom') {
+    const w = parseFloat(currentReaderSettings.customPaperWidth) || 8.5;
+    const h = parseFloat(currentReaderSettings.customPaperHeight) || 11;
+    return `${w}in ${h}in`;
+  }
+  return PAPER_PRESETS[presetKey]?.size || '8.5in 11in';
+}
+
+function preparePrintStylesheet() {
+  let styleEl = document.getElementById('va-reader-print-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'va-reader-print-style';
+    styleEl.setAttribute('media', 'print');
+    document.head.appendChild(styleEl);
+  }
+
+  const pageSize = getPrintPageSize();
+
+  styleEl.textContent = `
+    @page {
+      size: ${pageSize};
+      margin: 0.5in;
+    }
+
+    /* Hide all UI chrome, toolbars, settings drawers, and audio playback widgets */
+    header,
+    .reader-header,
+    .header-top,
+    .toolbar-scroll,
+    .accommodation-bar,
+    .tool-group,
+    .tool-item,
+    .reader-ruler-el,
+    .dict-modal,
+    .reader-tooltip,
+    .reader-kokoro-modal,
+    .reader-loading-overlay,
+    .upload-hero,
+    .reader-pagination-bar,
+    .tts-player,
+    .page-nav,
+    .dict-search-box,
+    #va-action-badge,
+    #va-dict-modal,
+    #reader-page-nav,
+    #dict-modal,
+    #reader-ruler,
+    #reader-tooltip,
+    #reader-kokoro-modal,
+    #upload-hero,
+    #print-btn,
+    #upload-nav-btn {
+      display: none !important;
+      visibility: hidden !important;
+    }
+
+    /* Force document text container and page canvas to 100% visible overflow with clean white background and black text */
+    html,
+    body,
+    body.va-reader-body {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 100% !important;
+      overflow: visible !important;
+    }
+
+    .reader-container {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+    }
+
+    .reader-document {
+      display: block !important;
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+    }
+
+    .reader-document * {
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+
+    .reader-page {
+      display: block !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: visible !important;
+      page-break-after: always;
+      break-after: page;
+      margin: 0 0 24px 0 !important;
+      padding: 0 !important;
+    }
+
+    .reader-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+      margin-bottom: 0 !important;
+    }
+
+    .page-header-tag {
+      display: block !important;
+      color: #555555 !important;
+      -webkit-text-fill-color: #555555 !important;
+      font-size: 0.75rem !important;
+      border-bottom: 1px solid #cccccc !important;
+      margin-bottom: 16px !important;
+      padding-bottom: 4px !important;
+    }
+
+    .reader-document p {
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      line-height: var(--leading, 1.5) !important;
+      letter-spacing: var(--tracking, 0px) !important;
+      word-spacing: var(--spacing, 0px) !important;
+      font-size: calc(var(--font-size, 18px) * 0.85) !important;
+      orphans: 3;
+      widows: 3;
+    }
+
+    .reader-document h1,
+    .reader-document h2,
+    .reader-document h3,
+    .reader-document h4,
+    .reader-document h5,
+    .reader-document h6 {
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    .va-bionic-fix {
+      font-weight: 700 !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+    }
+  `;
+}
+
+let isPrintingMultiPage = false;
+
+async function ensureAllPagesLoaded() {
+  if (!currentPdfDocument || currentTotalPages <= 1) return;
+  for (let i = 1; i <= currentTotalPages; i++) {
+    if (!currentLoadedPages[i - 1]) {
+      await extractPageData(i);
+    }
+  }
+}
+
+function renderAllPagesForPrint() {
+  if (!currentLoadedPages || currentLoadedPages.length <= 1) return;
+  const docContainer = document.getElementById('reader-document');
+  if (!docContainer) return;
+
+  isPrintingMultiPage = true;
+  docContainer.innerHTML = '';
+
+  const titleEl = document.createElement('h1');
+  titleEl.textContent = currentDocumentTitle;
+  docContainer.appendChild(titleEl);
+
+  const totalPages = currentTotalPages || currentLoadedPages.length;
+  currentLoadedPages.forEach((page) => {
+    if (!page) return;
+    const pageEl = document.createElement('section');
+    pageEl.className = 'reader-page';
+
+    const pageTag = document.createElement('span');
+    pageTag.className = 'page-header-tag';
+    pageTag.textContent = totalPages > 1 ? `Page ${page.pageNumber} of ${totalPages}` : `Page ${page.pageNumber}`;
+    pageEl.appendChild(pageTag);
+
+    page.paragraphs.forEach((paraText) => {
+      const p = document.createElement('p');
+      if (currentReaderSettings.bionic) {
+        p.innerHTML = applyBionicToParagraph(paraText);
+      } else {
+        p.textContent = paraText;
+      }
+      pageEl.appendChild(p);
+    });
+
+    docContainer.appendChild(pageEl);
+  });
+}
+
+function restoreAfterPrint() {
+  if (isPrintingMultiPage) {
+    isPrintingMultiPage = false;
+    displayExtractedPages(currentDocumentTitle);
+  }
+}
+
 function updateToolbarUI() {
   const fontEl = document.getElementById('reader-font');
   if (fontEl) fontEl.value = currentReaderSettings.font || 'Lexend';
@@ -833,6 +1143,26 @@ function updateToolbarUI() {
   previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
   updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice || 'female');
   checkReaderGpuAdmission();
+
+  const paperSizeEl = document.getElementById('reader-paper-size');
+  if (paperSizeEl) {
+    paperSizeEl.value = currentReaderSettings.paperSize || 'letter';
+  }
+  const customPaperGroup = document.getElementById('reader-custom-paper-group');
+  if (customPaperGroup) {
+    const isCustom = currentReaderSettings.paperSize === 'custom';
+    customPaperGroup.style.display = isCustom ? 'flex' : 'none';
+    customPaperGroup.classList.toggle('hidden', !isCustom);
+  }
+  const customWidthEl = document.getElementById('reader-custom-paper-width');
+  if (customWidthEl) {
+    customWidthEl.value = currentReaderSettings.customPaperWidth || 8.5;
+  }
+  const customHeightEl = document.getElementById('reader-custom-paper-height');
+  if (customHeightEl) {
+    customHeightEl.value = currentReaderSettings.customPaperHeight || 11;
+  }
+  preparePrintStylesheet();
 }
 
 function applyAllReaderStyles() {

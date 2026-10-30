@@ -736,19 +736,186 @@ body.contrast-inverted {
   --reader-border: #444400;
 }
 
-/* Print Styles */
+/* Paper Size & Custom Dimension Fields */
+.custom-paper-fields {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paper-dim-field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #222;
+  border: 1px solid #444;
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+
+.paper-dim-field label {
+  font-size: 0.65rem;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.paper-dim-input {
+  width: 44px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  font-weight: 600;
+  padding: 0;
+}
+
+.paper-dim-times {
+  color: #888;
+  font-size: 0.8rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.custom-paper-item.hidden {
+  display: none !important;
+}
+
+/* Base Print Styles */
 @media print {
-  .reader-header, .reader-ruler-el, .dict-modal {
+  header,
+  .reader-header,
+  .header-top,
+  .toolbar-scroll,
+  .accommodation-bar,
+  .tool-group,
+  .tool-item,
+  .reader-ruler-el,
+  .dict-modal,
+  .reader-tooltip,
+  .reader-kokoro-modal,
+  .reader-loading-overlay,
+  .upload-hero,
+  .reader-pagination-bar,
+  .tts-player,
+  .page-nav,
+  .dict-search-box,
+  #va-action-badge,
+  #va-dict-modal,
+  #reader-page-nav,
+  #print-btn,
+  #upload-nav-btn {
     display: none !important;
+    visibility: hidden !important;
   }
+
+  html,
+  body,
   body.va-reader-body {
-    background: #fff !important;
-    color: #000 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
+
+  .reader-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+  }
+
   .reader-document {
+    display: block !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
     padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .reader-document * {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .reader-page {
+    display: block !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    page-break-after: always;
+    break-after: page;
+    margin: 0 0 24px 0 !important;
+    padding: 0 !important;
+  }
+
+  .reader-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .page-header-tag {
+    display: block !important;
+    color: #555555 !important;
+    -webkit-text-fill-color: #555555 !important;
+    font-size: 0.75rem !important;
+    border-bottom: 1px solid #cccccc !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .reader-document p {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    line-height: var(--leading, 1.5) !important;
+    letter-spacing: var(--tracking, 0px) !important;
+    word-spacing: var(--spacing, 0px) !important;
+    font-size: calc(var(--font-size, 18px) * 0.85) !important;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .reader-document h1,
+  .reader-document h2,
+  .reader-document h3,
+  .reader-document h4,
+  .reader-document h5,
+  .reader-document h6 {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .va-bionic-fix {
+    font-weight: 700 !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
   }
 }
 
