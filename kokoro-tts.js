@@ -210,6 +210,9 @@ function getKokoroInstance() {
  * Generate audio Blob via Web Worker or main-thread fallback
  */
 async function generateKokoroAudioBlob(text, options = {}) {
+  const voice = options.voice || 'af_heart';
+  const speed = typeof options.speed === 'number' ? options.speed : 1.0;
+
   const worker = getOrCreateWorker();
   if (worker) {
     const id = ++workerMsgId;
@@ -220,8 +223,8 @@ async function generateKokoroAudioBlob(text, options = {}) {
         action: 'generate',
         data: {
           text,
-          voice: options.voice || 'af_heart',
-          speed: typeof speed === 'number' ? speed : (typeof options.speed === 'number' ? options.speed : 1.0)
+          voice,
+          speed
         }
       });
     });
@@ -230,8 +233,6 @@ async function generateKokoroAudioBlob(text, options = {}) {
 
   // Fallback to main thread
   const tts = kokoroTtsInstance || (await loadKokoroModel(options.progressCallback));
-  const voice = options.voice || 'af_heart';
-  const speed = typeof options.speed === 'number' ? options.speed : 1.0;
   const rawAudio = await tts.generate(text, { voice, speed });
   return rawAudio.toBlob();
 }
