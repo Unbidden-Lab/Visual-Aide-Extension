@@ -275,6 +275,15 @@ body.va-reader-body {
   color: #111;
   font-weight: 700;
 }
+.tool-btn.loading {
+  opacity: 0.85;
+  cursor: wait;
+}
+.tool-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 input[type=range] {
   accent-color: var(--accent);

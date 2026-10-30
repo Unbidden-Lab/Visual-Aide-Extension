@@ -12,7 +12,8 @@
     "storage",
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -43,7 +44,10 @@
     {
       "resources": [
         "fonts/*",
-        "lib/*"
+        "lib/*",
+        "kokoro-worker.js",
+        "offscreen.html",
+        "offscreen.js"
       ],
       "matches": ["<all_urls>"]
     }

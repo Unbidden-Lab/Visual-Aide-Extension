@@ -1,7 +1,8 @@
 /**
  * Visual Aide - Kokoro Studio Neural TTS Engine
  * Integrates Kokoro-82M ONNX model client-side via kokoro.js.
- * Provides on-demand download, local cache detection, and audio playback.
+ * Provides on-demand download, local cache detection, background Web Worker generation,
+ * and audio playback.
  */
 
 const KOKORO_VOICES = {
@@ -15,6 +16,57 @@ let kokoroTtsInstance = null;
 let kokoroModelInitPromise = null;
 let currentKokoroAudio = null;
 let currentKokoroAudioUrl = null;
+
+let kokoroWorker = null;
+let workerMsgId = 0;
+const workerCallbacks = new Map();
+
+/**
+ * Initialize or retrieve the dedicated Kokoro Web Worker
+ */
+function getOrCreateWorker() {
+  if (kokoroWorker) return kokoroWorker;
+  if (typeof Worker === 'undefined') return null;
+
+  try {
+    const workerUrl = (typeof chrome !== 'undefined' && chrome.runtime?.getURL)
+      ? chrome.runtime.getURL('kokoro-worker.js')
+      : './kokoro-worker.js';
+
+    kokoroWorker = new Worker(workerUrl, { type: 'module' });
+
+    kokoroWorker.onmessage = (e) => {
+      const { id, type, data, blob, error } = e.data || {};
+      const cb = workerCallbacks.get(id);
+      if (!cb) return;
+
+      if (type === 'progress') {
+        if (typeof cb.onProgress === 'function') {
+          cb.onProgress(data);
+        }
+      } else if (type === 'init_done') {
+        workerCallbacks.delete(id);
+        cb.resolve(true);
+      } else if (type === 'generated') {
+        workerCallbacks.delete(id);
+        cb.resolve(blob);
+      } else if (type === 'error') {
+        workerCallbacks.delete(id);
+        cb.reject(new Error(error || 'Kokoro worker operation failed'));
+      }
+    };
+
+    kokoroWorker.onerror = (err) => {
+      console.warn('Kokoro Worker error:', err);
+    };
+
+    return kokoroWorker;
+  } catch (err) {
+    console.warn('Could not initialize Kokoro Web Worker, falling back to main thread:', err);
+    kokoroWorker = null;
+    return null;
+  }
+}
 
 /**
  * Check if the given voice ID belongs to the Kokoro Studio engine
@@ -74,12 +126,31 @@ async function loadKokoroModel(progressCallback) {
   if (kokoroTtsInstance) {
     return kokoroTtsInstance;
   }
+
+  // 1. Attempt initialization in dedicated worker
+  const worker = getOrCreateWorker();
+  if (worker) {
+    const id = ++workerMsgId;
+    await new Promise((resolve, reject) => {
+      workerCallbacks.set(id, { resolve, reject, onProgress: progressCallback });
+      worker.postMessage({ id, action: 'init' });
+    });
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ kokoro_model_cached: true });
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('va_kokoro_model_cached', 'true');
+    }
+    return { isWorker: true };
+  }
+
+  // 2. Fallback to main thread if worker is unavailable
   if (kokoroModelInitPromise) {
     return kokoroModelInitPromise;
   }
 
   kokoroModelInitPromise = (async () => {
-    // Dynamic import of kokoro.web.js bundle
     const libUrl = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL)
       ? chrome.runtime.getURL('lib/kokoro.web.js')
       : './lib/kokoro.web.js';
@@ -99,7 +170,6 @@ async function loadKokoroModel(progressCallback) {
       }
     }
 
-    // Initialize quantized Q8 model as specified
     const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
       dtype: 'q8',
       progress_callback: (info) => {
@@ -111,7 +181,6 @@ async function loadKokoroModel(progressCallback) {
 
     kokoroTtsInstance = tts;
 
-    // Mark cached in local storage
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ kokoro_model_cached: true });
     }
@@ -138,19 +207,44 @@ function getKokoroInstance() {
 }
 
 /**
- * Generate speech audio from text using active Kokoro instance
+ * Generate audio Blob via Web Worker or main-thread fallback
  */
-async function generateKokoroAudio(text, options = {}) {
+async function generateKokoroAudioBlob(text, options = {}) {
+  const worker = getOrCreateWorker();
+  if (worker) {
+    const id = ++workerMsgId;
+    const blob = await new Promise((resolve, reject) => {
+      workerCallbacks.set(id, { resolve, reject, onProgress: options.progressCallback });
+      worker.postMessage({
+        id,
+        action: 'generate',
+        data: {
+          text,
+          voice: options.voice || 'af_heart',
+          speed: typeof speed === 'number' ? speed : (typeof options.speed === 'number' ? options.speed : 1.0)
+        }
+      });
+    });
+    return blob;
+  }
+
+  // Fallback to main thread
   const tts = kokoroTtsInstance || (await loadKokoroModel(options.progressCallback));
   const voice = options.voice || 'af_heart';
   const speed = typeof options.speed === 'number' ? options.speed : 1.0;
+  const rawAudio = await tts.generate(text, { voice, speed });
+  return rawAudio.toBlob();
+}
 
-  const rawAudio = await tts.generate(text, {
-    voice,
-    speed
-  });
-
-  return rawAudio;
+/**
+ * Generate speech audio from text
+ */
+async function generateKokoroAudio(text, options = {}) {
+  const blob = await generateKokoroAudioBlob(text, options);
+  return {
+    toBlob: () => blob,
+    blob
+  };
 }
 
 /**
@@ -159,15 +253,12 @@ async function generateKokoroAudio(text, options = {}) {
 async function playKokoroAudio(text, options = {}) {
   stopKokoroAudio();
 
-  const rawAudio = await generateKokoroAudio(text, options);
-  const blob = rawAudio.toBlob();
+  const blob = await generateKokoroAudioBlob(text, options);
   const audioUrl = URL.createObjectURL(blob);
 
   currentKokoroAudioUrl = audioUrl;
   currentKokoroAudio = new Audio(audioUrl);
-
-  const speed = typeof options.speed === 'number' ? options.speed : 1.0;
-  currentKokoroAudio.playbackRate = 1.0; // Speed already baked into Kokoro inference
+  currentKokoroAudio.playbackRate = 1.0;
 
   currentKokoroAudio.onplay = () => {
     if (typeof options.onStart === 'function') options.onStart();
@@ -243,6 +334,7 @@ const KokoroEngine = {
   isKokoroModelCached,
   loadKokoroModel,
   getKokoroInstance,
+  generateKokoroAudioBlob,
   generateKokoroAudio,
   playKokoroAudio,
   pauseKokoroAudio,

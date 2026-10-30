@@ -1290,14 +1290,34 @@ function handleReaderMouseMove(e) {
 // -------------------------------------------------------------
 // Text to Speech (TTS)
 // -------------------------------------------------------------
+let isReaderTtsGenerating = false;
+
+function setReaderTtsGenerating(isGenerating) {
+  isReaderTtsGenerating = isGenerating;
+  const playBtn = document.getElementById('reader-tts-play');
+  if (!playBtn) return;
+  if (isGenerating) {
+    playBtn.textContent = 'Generating audio...';
+    playBtn.setAttribute('aria-label', 'Generating audio...');
+    playBtn.disabled = true;
+    playBtn.classList.add('loading');
+    playBtn.classList.remove('active');
+  } else {
+    playBtn.disabled = false;
+    playBtn.classList.remove('loading');
+  }
+}
+
 function updateReaderTtsUi(isPlaying) {
   const playBtn = document.getElementById('reader-tts-play');
   if (!playBtn) return;
   if (isPlaying) {
+    setReaderTtsGenerating(false);
     playBtn.textContent = 'Pause';
     playBtn.setAttribute('aria-label', 'Pause reading aloud');
     playBtn.classList.add('active');
   } else {
+    setReaderTtsGenerating(false);
     playBtn.textContent = 'Play';
     playBtn.setAttribute('aria-label', 'Read page aloud');
     playBtn.classList.remove('active');
@@ -1385,11 +1405,15 @@ async function playNextReaderTtsChunk() {
 
   // 1. Route to Kokoro Studio Neural Engine
   if (isKokoroVoice(activeVoice)) {
-    updateReaderTtsUi(true);
+    setReaderTtsGenerating(true);
     try {
       await playKokoroAudio(chunk, {
         voice: activeVoice,
         speed: speedVal,
+        onStart: () => {
+          setReaderTtsGenerating(false);
+          updateReaderTtsUi(true);
+        },
         onEnd: () => {
           if (readerTtsQueue.length === 0) return;
           readerTtsIndex++;
@@ -1397,6 +1421,7 @@ async function playNextReaderTtsChunk() {
         },
         onError: (err) => {
           console.warn('Reader Kokoro chunk error:', err);
+          setReaderTtsGenerating(false);
           if (readerTtsQueue.length === 0) return;
           readerTtsIndex++;
           playNextReaderTtsChunk();
@@ -1404,6 +1429,7 @@ async function playNextReaderTtsChunk() {
       });
     } catch (err) {
       console.error('Kokoro synthesis error:', err);
+      setReaderTtsGenerating(false);
       handleTtsStop();
     }
     return;
@@ -1455,6 +1481,11 @@ async function playNextReaderTtsChunk() {
 }
 
 function handleTtsPlay() {
+  // Prevent double clicks while audio is actively being generated
+  if (isReaderTtsGenerating) {
+    return;
+  }
+
   const activeVoice = currentReaderSettings.ttsVoice || 'female';
 
   // Kokoro playback controls (Play / Pause / Resume)
@@ -1489,6 +1520,9 @@ function handleTtsPlay() {
     handleTtsStop();
     readerTtsQueue = chunks;
     readerTtsIndex = 0;
+
+    // Immediately update Play button to active generation state and disable double-clicks
+    setReaderTtsGenerating(true);
     playNextReaderTtsChunk();
     return;
   }

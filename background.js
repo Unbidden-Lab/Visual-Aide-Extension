@@ -51,7 +51,41 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-// CSP-safe dictionary lookup proxy for content scripts
+let creatingOffscreenPromise = null;
+
+async function ensureOffscreenDocument() {
+  const offscreenUrl = chrome.runtime.getURL('offscreen.html');
+
+  if ('getContexts' in chrome.runtime) {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+      documentUrls: [offscreenUrl]
+    });
+    if (contexts.length > 0) return;
+  } else if (self.clients && typeof self.clients.matchAll === 'function') {
+    const clients = await self.clients.matchAll();
+    if (clients.some(c => c.url === offscreenUrl)) return;
+  }
+
+  if (creatingOffscreenPromise) {
+    await creatingOffscreenPromise;
+    return;
+  }
+
+  creatingOffscreenPromise = chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'],
+    justification: 'Synthesize and play Kokoro neural TTS speech'
+  });
+
+  try {
+    await creatingOffscreenPromise;
+  } finally {
+    creatingOffscreenPromise = null;
+  }
+}
+
+// CSP-safe dictionary lookup proxy and Kokoro audio routing for content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'lookup_word' && request.word) {
     lookupSimplifiedWord(request.word)
@@ -67,5 +101,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         source: 'error'
       }));
     return true; // Keep message channel open for async response
+  }
+
+  if (request.action && request.action.startsWith('BG_KOKORO_')) {
+    const offscreenAction = request.action.replace('BG_KOKORO_', 'OFFSCREEN_KOKORO_');
+    ensureOffscreenDocument()
+      .then(() => {
+        chrome.runtime.sendMessage({ ...request, action: offscreenAction }, (response) => {
+          if (chrome.runtime.lastError) {
+            // Ignore channel close warnings
+          }
+          sendResponse(response || { ok: true });
+        });
+      })
+      .catch((err) => {
+        console.warn('Failed to ensure offscreen document:', err);
+        sendResponse({ ok: false, error: err.message });
+      });
+    return true; // Keep channel open
   }
 });

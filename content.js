@@ -234,6 +234,15 @@ let lastMouseY = 0;
 let lastFocusedElement = null;
 
 // SpeechSynthesis chunk queue and heartbeat state
+const KOKORO_VOICE_IDS = new Set(['af_heart', 'af_bella', 'am_adam', 'bm_george']);
+
+function isKokoroVoice(voiceId) {
+  return Boolean(voiceId && KOKORO_VOICE_IDS.has(voiceId));
+}
+
+let isKokoroActivePlaying = false;
+let isKokoroActiveGenerating = false;
+
 let ttsQueue = [];
 let ttsActiveIndex = 0;
 let ttsHeartbeatTimer = null;
@@ -554,6 +563,14 @@ function setupStyleBlock() {
     }
     .va-action-chip:hover {
       background: rgba(0, 255, 204, 0.2);
+    }
+    .va-action-chip.loading {
+      opacity: 0.8;
+      cursor: wait;
+    }
+    .va-action-chip:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
     .va-chip-divider {
       width: 1px;
@@ -1309,6 +1326,27 @@ function stopTtsHeartbeat() {
   }
 }
 
+function stopKokoroPlayback() {
+  isKokoroActiveGenerating = false;
+  isKokoroActivePlaying = false;
+  try {
+    chrome.runtime.sendMessage({ action: 'BG_KOKORO_STOP' }).catch(() => {});
+  } catch (_) {}
+  resetKokoroBtn();
+}
+
+function resetKokoroBtn() {
+  isKokoroActiveGenerating = false;
+  isKokoroActivePlaying = false;
+  if (activeTtsBtn) {
+    activeTtsBtn.innerHTML = 'Read';
+    activeTtsBtn.setAttribute('aria-label', 'Read selected text aloud');
+    activeTtsBtn.classList.remove('loading');
+    activeTtsBtn.disabled = false;
+    activeTtsBtn = null;
+  }
+}
+
 function stopTtsPlayback() {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
@@ -1316,11 +1354,8 @@ function stopTtsPlayback() {
   stopTtsHeartbeat();
   ttsQueue = [];
   ttsActiveIndex = 0;
-  if (activeTtsBtn) {
-    activeTtsBtn.innerHTML = 'Read';
-    activeTtsBtn.setAttribute('aria-label', 'Read selected text aloud');
-    activeTtsBtn = null;
-  }
+  stopKokoroPlayback();
+  resetKokoroBtn();
 }
 
 async function playNextTtsChunk() {
@@ -1371,12 +1406,68 @@ async function playNextTtsChunk() {
 }
 
 function speakText(text, btnEl) {
+  chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
+    const voice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender || currentSettings.ttsVoice || 'female';
+    const speed = parseFloat(syncRes?.ttsSpeed ?? syncRes?.ttsRate ?? currentSettings.ttsSpeed ?? 1.0);
+
+    if (isKokoroVoice(voice)) {
+      handleKokoroSpeak(text, btnEl, voice, speed);
+    } else {
+      handleStandardSpeak(text, btnEl, voice, speed);
+    }
+  });
+}
+
+function handleKokoroSpeak(text, btnEl, voice, speed) {
+  if (isKokoroActivePlaying || isKokoroActiveGenerating) {
+    stopKokoroPlayback();
+    return;
+  }
+
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+  }
+
+  activeTtsBtn = btnEl;
+  if (btnEl) {
+    btnEl.innerHTML = 'Generating...';
+    btnEl.setAttribute('aria-label', 'Generating audio with Kokoro Studio');
+    btnEl.classList.add('loading');
+    btnEl.disabled = true;
+  }
+
+  isKokoroActiveGenerating = true;
+
+  chrome.runtime.sendMessage({
+    action: 'BG_KOKORO_PLAY',
+    text,
+    voice,
+    speed
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn('Kokoro play request error:', chrome.runtime.lastError.message);
+      resetKokoroBtn();
+      return;
+    }
+    if (response && response.error) {
+      console.warn('Kokoro speech error:', response.error);
+      if (response.error === 'model_not_cached') {
+        alert('Please open the Visual Aide popup and download the Kokoro Studio voice before using offline AI speech.');
+      }
+      resetKokoroBtn();
+    }
+  });
+}
+
+function handleStandardSpeak(text, btnEl, voice, speed) {
   if (!window.speechSynthesis) return;
 
   if (window.speechSynthesis.speaking || ttsQueue.length > 0) {
     stopTtsPlayback();
     return;
   }
+
+  stopKokoroPlayback();
 
   const chunks = chunkTextForTts(text);
   if (chunks.length === 0) return;
@@ -1385,6 +1476,8 @@ function speakText(text, btnEl) {
   if (btnEl) {
     btnEl.innerHTML = 'Stop';
     btnEl.setAttribute('aria-label', 'Stop read aloud playback');
+    btnEl.classList.remove('loading');
+    btnEl.disabled = false;
   }
 
   ttsQueue = chunks;
@@ -1525,20 +1618,70 @@ async function openInPageDictionary(word, x, y) {
       };
     });
     document.getElementById('va-word-speak').onclick = async () => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const voices = await getVoicesAsync();
-        const u = new SpeechSynthesisUtterance(entry.word);
-        u.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
-        const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
-        if (preferredVoice) {
-          u.voice = preferredVoice;
-          u.lang = preferredVoice.lang || 'en-US';
-        } else {
-          u.lang = 'en-US';
+      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], async (syncRes) => {
+        const voice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender || currentSettings.ttsVoice || 'female';
+        const speed = parseFloat(syncRes?.ttsSpeed ?? syncRes?.ttsRate ?? currentSettings.ttsSpeed ?? 1.0);
+        const wordSpeakBtn = document.getElementById('va-word-speak');
+
+        if (isKokoroVoice(voice)) {
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+          if (wordSpeakBtn) {
+            wordSpeakBtn.textContent = '...';
+            wordSpeakBtn.disabled = true;
+          }
+
+          chrome.runtime.sendMessage({
+            action: 'BG_KOKORO_PLAY',
+            text: entry.word,
+            voice,
+            speed
+          }, (res) => {
+            if (chrome.runtime.lastError || (res && res.error)) {
+              if (wordSpeakBtn) {
+                wordSpeakBtn.textContent = 'Pronounce';
+                wordSpeakBtn.disabled = false;
+              }
+            }
+          });
+
+          const restoreTimer = setTimeout(() => {
+            if (wordSpeakBtn) {
+              wordSpeakBtn.textContent = 'Pronounce';
+              wordSpeakBtn.disabled = false;
+            }
+          }, 4000);
+
+          const statusHandler = (msg) => {
+            if (msg.action === 'KOKORO_STATUS_UPDATE' && (msg.status === 'ended' || msg.status === 'stopped' || msg.status === 'error')) {
+              clearTimeout(restoreTimer);
+              if (wordSpeakBtn) {
+                wordSpeakBtn.textContent = 'Pronounce';
+                wordSpeakBtn.disabled = false;
+              }
+              chrome.runtime.onMessage.removeListener(statusHandler);
+            }
+          };
+          chrome.runtime.onMessage.addListener(statusHandler);
+          return;
         }
-        window.speechSynthesis.speak(u);
-      }
+
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const voices = await getVoicesAsync();
+          const u = new SpeechSynthesisUtterance(entry.word);
+          u.rate = speed;
+          const preferredVoice = getResolvedVoice(voices, voice);
+          if (preferredVoice) {
+            u.voice = preferredVoice;
+            u.lang = preferredVoice.lang || 'en-US';
+          } else {
+            u.lang = 'en-US';
+          }
+          window.speechSynthesis.speak(u);
+        }
+      });
     };
   } else {
     dictModal.innerHTML = `
@@ -1633,6 +1776,37 @@ function boot() {
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === 'update_styles' && request.settings) {
     applyAll(request.settings);
+  }
+
+  if (request.action === 'KOKORO_STATUS_UPDATE') {
+    if (request.status === 'generating') {
+      isKokoroActiveGenerating = true;
+      isKokoroActivePlaying = false;
+      if (activeTtsBtn) {
+        activeTtsBtn.innerHTML = 'Generating...';
+        activeTtsBtn.setAttribute('aria-label', 'Generating audio with Kokoro Studio');
+        activeTtsBtn.classList.add('loading');
+        activeTtsBtn.disabled = true;
+      }
+    } else if (request.status === 'playing') {
+      isKokoroActiveGenerating = false;
+      isKokoroActivePlaying = true;
+      if (activeTtsBtn) {
+        activeTtsBtn.innerHTML = 'Stop';
+        activeTtsBtn.setAttribute('aria-label', 'Stop Kokoro Studio audio playback');
+        activeTtsBtn.classList.remove('loading');
+        activeTtsBtn.disabled = false;
+      }
+    } else if (request.status === 'paused') {
+      isKokoroActivePlaying = false;
+      if (activeTtsBtn) {
+        activeTtsBtn.innerHTML = 'Resume';
+        activeTtsBtn.classList.remove('loading');
+        activeTtsBtn.disabled = false;
+      }
+    } else if (request.status === 'ended' || request.status === 'stopped' || request.status === 'error') {
+      resetKokoroBtn();
+    }
   }
 });
 
