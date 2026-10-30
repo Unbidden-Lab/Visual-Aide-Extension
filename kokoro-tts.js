@@ -1,8 +1,10 @@
 /**
  * Visual Aide - Kokoro Studio Neural TTS Engine
  * Integrates Kokoro-82M ONNX model client-side via kokoro.js.
- * Provides WebGPU device acceleration with WASM fallback, dedicated Web Worker offloading,
- * sentence chunking streaming queue with proactive background prefetching, and audio playback.
+ * Implements a two-tier acceleration architecture:
+ * - Universal / Lightweight Mode (CPU / ~85 MB): WebAssembly runner with 8-bit quantized weights (q8).
+ * - Turbo Mode (GPU / ~330 MB): WebGPU acceleration with full 32-bit floating-point weights (fp32).
+ * Includes sentence chunking streaming queue with proactive background prefetching.
  */
 
 const KOKORO_VOICES = {
@@ -13,6 +15,7 @@ const KOKORO_VOICES = {
 };
 
 let kokoroTtsInstance = null;
+let currentLoadedTier = null;
 let kokoroModelInitPromise = null;
 let currentKokoroAudio = null;
 let currentKokoroAudioUrl = null;
@@ -41,7 +44,7 @@ function getOrCreateWorker() {
     kokoroWorker = new Worker(workerUrl, { type: 'module' });
 
     kokoroWorker.onmessage = (e) => {
-      const { id, type, data, blob, error } = e.data || {};
+      const { id, type, data, blob, error, tier } = e.data || {};
       const cb = workerCallbacks.get(id);
       if (!cb) return;
 
@@ -51,7 +54,7 @@ function getOrCreateWorker() {
         }
       } else if (type === 'init_done') {
         workerCallbacks.delete(id);
-        cb.resolve(true);
+        cb.resolve({ ok: true, tier });
       } else if (type === 'generated') {
         workerCallbacks.delete(id);
         cb.resolve(blob);
@@ -70,6 +73,21 @@ function getOrCreateWorker() {
     console.warn('Could not initialize Kokoro Web Worker, falling back to main thread:', err);
     kokoroWorker = null;
     return null;
+  }
+}
+
+/**
+ * Check if WebGPU is supported and available on this device/browser
+ */
+async function isWebGpuSupported() {
+  if (typeof navigator === 'undefined' || !navigator.gpu) {
+    return false;
+  }
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    return Boolean(adapter);
+  } catch (err) {
+    return false;
   }
 }
 
@@ -112,21 +130,25 @@ function splitIntoSentences(text) {
 }
 
 /**
- * Check whether the Kokoro ONNX model weights are already cached locally
+ * Check whether the Kokoro ONNX model weights for the requested tier are already cached locally
+ * @param {string} tier - 'wasm' (Lightweight / q8) or 'webgpu' (Turbo / fp32)
  */
-async function isKokoroModelCached() {
+async function isKokoroModelCached(tier = 'wasm') {
+  const isWebGpu = tier === 'webgpu';
+  const storageKey = isWebGpu ? 'kokoro_model_cached_webgpu' : 'kokoro_model_cached_wasm';
+
   try {
     // 1. Check storage flag
     const stored = await new Promise((resolve) => {
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-        chrome.storage.local.get(['kokoro_model_cached'], resolve);
+        chrome.storage.local.get([storageKey, 'kokoro_model_cached'], resolve);
       } else {
-        const flag = (typeof localStorage !== 'undefined') ? localStorage.getItem('va_kokoro_model_cached') === 'true' : false;
-        resolve({ kokoro_model_cached: flag });
+        const flag = (typeof localStorage !== 'undefined') ? localStorage.getItem('va_' + storageKey) === 'true' : false;
+        resolve({ [storageKey]: flag });
       }
     });
 
-    if (stored && stored.kokoro_model_cached) {
+    if (stored && (stored[storageKey] || (!isWebGpu && stored.kokoro_model_cached))) {
       return true;
     }
 
@@ -135,13 +157,21 @@ async function isKokoroModelCached() {
       try {
         const cache = await caches.open('transformers-cache');
         const requests = await cache.keys();
-        const hasOnnx = requests.some(r => r.url.includes('Kokoro-82M') || r.url.includes('model_q8.onnx'));
-        if (hasOnnx) {
+        const hasMatch = requests.some(r => {
+          if (!r.url.includes('Kokoro-82M')) return false;
+          if (isWebGpu) {
+            return r.url.includes('model.onnx') && !r.url.includes('model_q8.onnx');
+          } else {
+            return r.url.includes('model_q8.onnx');
+          }
+        });
+
+        if (hasMatch) {
           if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-            chrome.storage.local.set({ kokoro_model_cached: true });
+            chrome.storage.local.set({ [storageKey]: true });
           }
           if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('va_kokoro_model_cached', 'true');
+            localStorage.setItem('va_' + storageKey, 'true');
           }
           return true;
         }
@@ -156,11 +186,15 @@ async function isKokoroModelCached() {
 }
 
 /**
- * Load or initialize the Kokoro TTS engine on-demand with progress tracking
- * Attempts WebGPU device acceleration first, gracefully falling back to WASM CPU runner.
+ * Load or initialize the Kokoro TTS engine on-demand for the requested tier
+ * @param {Function} progressCallback - Download progress tracker
+ * @param {string} tier - 'wasm' (Lightweight / q8) or 'webgpu' (Turbo / fp32)
  */
-async function loadKokoroModel(progressCallback) {
-  if (kokoroTtsInstance) {
+async function loadKokoroModel(progressCallback, tier = 'wasm') {
+  const targetTier = tier === 'webgpu' ? 'webgpu' : 'wasm';
+  const storageKey = targetTier === 'webgpu' ? 'kokoro_model_cached_webgpu' : 'kokoro_model_cached_wasm';
+
+  if (kokoroTtsInstance && currentLoadedTier === targetTier) {
     return kokoroTtsInstance;
   }
 
@@ -170,20 +204,22 @@ async function loadKokoroModel(progressCallback) {
     const id = ++workerMsgId;
     await new Promise((resolve, reject) => {
       workerCallbacks.set(id, { resolve, reject, onProgress: progressCallback });
-      worker.postMessage({ id, action: 'init' });
+      worker.postMessage({ id, action: 'init', data: { tier: targetTier } });
     });
 
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ kokoro_model_cached: true });
+      chrome.storage.local.set({ [storageKey]: true, kokoro_model_cached: true });
     }
     if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('va_' + storageKey, 'true');
       localStorage.setItem('va_kokoro_model_cached', 'true');
     }
-    return { isWorker: true };
+    currentLoadedTier = targetTier;
+    return { isWorker: true, tier: targetTier };
   }
 
   // 2. Fallback to main thread if worker is unavailable
-  if (kokoroModelInitPromise) {
+  if (kokoroModelInitPromise && currentLoadedTier === targetTier) {
     return kokoroModelInitPromise;
   }
 
@@ -209,41 +245,44 @@ async function loadKokoroModel(progressCallback) {
 
     let tts = null;
 
-    // Attempt WebGPU device acceleration
-    try {
-      tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
-        dtype: 'q8',
-        device: 'webgpu',
-        progress_callback: (info) => {
-          if (typeof progressCallback === 'function') {
-            progressCallback(info);
+    // Turbo Mode: WebGPU with full 32-bit floating-point weights
+    if (targetTier === 'webgpu') {
+      try {
+        console.log('Loading Kokoro Turbo Mode (WebGPU / fp32)...');
+        tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+          dtype: 'fp32',
+          device: 'webgpu',
+          progress_callback: (info) => {
+            if (typeof progressCallback === 'function') progressCallback(info);
           }
-        }
-      });
-    } catch (gpuErr) {
-      console.warn('Kokoro WebGPU device acceleration unavailable, falling back to WASM:', gpuErr);
-      tts = null;
+        });
+        currentLoadedTier = 'webgpu';
+      } catch (gpuErr) {
+        console.warn('WebGPU Turbo Mode failed, falling back to Lightweight WASM:', gpuErr);
+        tts = null;
+      }
     }
 
-    // Graceful fallback to WASM CPU runner
+    // Universal / Lightweight Mode: CPU WebAssembly with 8-bit quantized weights
     if (!tts) {
+      console.log('Loading Kokoro Lightweight Mode (WASM / q8)...');
       tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
         dtype: 'q8',
         device: 'wasm',
         progress_callback: (info) => {
-          if (typeof progressCallback === 'function') {
-            progressCallback(info);
-          }
+          if (typeof progressCallback === 'function') progressCallback(info);
         }
       });
+      currentLoadedTier = 'wasm';
     }
 
     kokoroTtsInstance = tts;
 
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.set({ kokoro_model_cached: true });
+      chrome.storage.local.set({ [storageKey]: true, kokoro_model_cached: true });
     }
     if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('va_' + storageKey, 'true');
       localStorage.setItem('va_kokoro_model_cached', 'true');
     }
 
@@ -271,6 +310,7 @@ function getKokoroInstance() {
 async function generateKokoroAudioBlob(text, options = {}) {
   const voice = options.voice || 'af_heart';
   const speed = typeof options.speed === 'number' ? options.speed : 1.0;
+  const tier = options.tier === 'webgpu' ? 'webgpu' : 'wasm';
 
   const worker = getOrCreateWorker();
   if (worker) {
@@ -283,7 +323,8 @@ async function generateKokoroAudioBlob(text, options = {}) {
         data: {
           text,
           voice,
-          speed
+          speed,
+          tier
         }
       });
     });
@@ -291,7 +332,9 @@ async function generateKokoroAudioBlob(text, options = {}) {
   }
 
   // Fallback to main thread
-  const tts = kokoroTtsInstance || (await loadKokoroModel(options.progressCallback));
+  const tts = (kokoroTtsInstance && currentLoadedTier === tier)
+    ? kokoroTtsInstance
+    : (await loadKokoroModel(options.progressCallback, tier));
   const rawAudio = await tts.generate(text, { voice, speed });
   return rawAudio.toBlob();
 }
@@ -506,6 +549,7 @@ function isKokoroAudioPaused() {
 const KokoroEngine = {
   VOICES: KOKORO_VOICES,
   isKokoroVoice,
+  isWebGpuSupported,
   isKokoroModelCached,
   loadKokoroModel,
   getKokoroInstance,

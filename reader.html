@@ -165,6 +165,15 @@
             </select>
           </div>
 
+          <!-- TTS Engine Tier -->
+          <div class="tool-item" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) or Turbo Mode (GPU / ~330 MB)">
+            <label for="reader-tts-engine-tier">Tier</label>
+            <select id="reader-tts-engine-tier" class="tool-select">
+              <option value="wasm">Lightweight (CPU / ~85 MB)</option>
+              <option value="webgpu">Turbo (GPU / ~330 MB)</option>
+            </select>
+          </div>
+
           <!-- Multi-Page Navigation Bar -->
           <div class="tool-item page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
             <label>Page</label>

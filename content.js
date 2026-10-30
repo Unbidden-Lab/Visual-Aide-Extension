@@ -74,7 +74,8 @@ let currentSettings = {
   ttsVoice: 'female',
   ttsVoiceGender: 'female',
   ttsSpeed: 1.0,
-  ttsRate: 1.0
+  ttsRate: 1.0,
+  ttsEngineTier: 'wasm'
 };
 
 // -------------------------------------------------------------
@@ -1406,19 +1407,20 @@ async function playNextTtsChunk() {
 }
 
 function speakText(text, btnEl) {
-  chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
+  chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], (syncRes) => {
     const voice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender || currentSettings.ttsVoice || 'female';
     const speed = parseFloat(syncRes?.ttsSpeed ?? syncRes?.ttsRate ?? currentSettings.ttsSpeed ?? 1.0);
+    const tier = syncRes?.ttsEngineTier || currentSettings.ttsEngineTier || 'wasm';
 
     if (isKokoroVoice(voice)) {
-      handleKokoroSpeak(text, btnEl, voice, speed);
+      handleKokoroSpeak(text, btnEl, voice, speed, tier);
     } else {
       handleStandardSpeak(text, btnEl, voice, speed);
     }
   });
 }
 
-function handleKokoroSpeak(text, btnEl, voice, speed) {
+function handleKokoroSpeak(text, btnEl, voice, speed, tier = 'wasm') {
   if (isKokoroActivePlaying || isKokoroActiveGenerating) {
     stopKokoroPlayback();
     return;
@@ -1442,7 +1444,8 @@ function handleKokoroSpeak(text, btnEl, voice, speed) {
     action: 'BG_KOKORO_PLAY',
     text,
     voice,
-    speed
+    speed,
+    tier
   }, (response) => {
     if (chrome.runtime.lastError) {
       console.warn('Kokoro play request error:', chrome.runtime.lastError.message);
@@ -1618,9 +1621,10 @@ async function openInPageDictionary(word, x, y) {
       };
     });
     document.getElementById('va-word-speak').onclick = async () => {
-      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], async (syncRes) => {
+      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], async (syncRes) => {
         const voice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender || currentSettings.ttsVoice || 'female';
         const speed = parseFloat(syncRes?.ttsSpeed ?? syncRes?.ttsRate ?? currentSettings.ttsSpeed ?? 1.0);
+        const tier = syncRes?.ttsEngineTier || currentSettings.ttsEngineTier || 'wasm';
         const wordSpeakBtn = document.getElementById('va-word-speak');
 
         if (isKokoroVoice(voice)) {
@@ -1636,7 +1640,8 @@ async function openInPageDictionary(word, x, y) {
             action: 'BG_KOKORO_PLAY',
             text: entry.word,
             voice,
-            speed
+            speed,
+            tier
           }, (res) => {
             if (chrome.runtime.lastError || (res && res.error)) {
               if (wordSpeakBtn) {
@@ -1743,7 +1748,7 @@ function applyAll(settings) {
 function boot() {
   getVoicesAsync();
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], (syncRes) => {
       const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
       if (syncVoice) {
         currentSettings.ttsVoice = syncVoice;
@@ -1753,6 +1758,10 @@ function boot() {
       if (syncSpeed !== undefined && syncSpeed !== null) {
         currentSettings.ttsSpeed = parseFloat(syncSpeed);
         currentSettings.ttsRate = parseFloat(syncSpeed);
+      }
+      const syncTier = syncRes?.ttsEngineTier;
+      if (syncTier) {
+        currentSettings.ttsEngineTier = syncTier;
       }
     });
   }
@@ -1824,6 +1833,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
       if (syncSpeed !== undefined && syncSpeed !== null) {
         currentSettings.ttsSpeed = parseFloat(syncSpeed);
         currentSettings.ttsRate = parseFloat(syncSpeed);
+      }
+    }
+    if (changes.ttsEngineTier) {
+      const syncTier = changes.ttsEngineTier?.newValue;
+      if (syncTier) {
+        currentSettings.ttsEngineTier = syncTier;
       }
     }
   }

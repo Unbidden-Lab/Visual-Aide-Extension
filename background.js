@@ -24,7 +24,8 @@ const DEFAULT_SETTINGS = {
   ttsVoice: 'female',
   ttsVoiceGender: 'female',
   ttsSpeed: 1.0,
-  ttsRate: 1.0
+  ttsRate: 1.0,
+  ttsEngineTier: 'wasm'
 };
 
 chrome.runtime.onInstalled.addListener(() => {

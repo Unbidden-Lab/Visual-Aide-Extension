@@ -15,13 +15,14 @@ function broadcastStatus(status, extra = {}) {
   } catch (_) {}
 }
 
-async function handleKokoroPlay(text, voice, speed, sendResponse) {
+async function handleKokoroPlay(text, voice, speed, tier, sendResponse) {
   try {
     if (typeof KokoroEngine !== 'undefined') {
       KokoroEngine.stopKokoroAudio();
     }
 
-    const isCached = await KokoroEngine.isKokoroModelCached();
+    const currentTier = tier || 'wasm';
+    const isCached = await KokoroEngine.isKokoroModelCached(currentTier);
     if (!isCached) {
       sendResponse({ ok: false, error: 'model_not_cached' });
       broadcastStatus('error', { error: 'model_not_cached' });
@@ -34,6 +35,7 @@ async function handleKokoroPlay(text, voice, speed, sendResponse) {
     await KokoroEngine.playKokoroAudio(text, {
       voice: voice || 'af_heart',
       speed: typeof speed === 'number' ? speed : 1.0,
+      tier: currentTier,
       onStart: () => {
         broadcastStatus('playing');
       },
@@ -56,7 +58,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || !request.action) return false;
 
   if (request.action === 'OFFSCREEN_KOKORO_PLAY') {
-    handleKokoroPlay(request.text, request.voice, request.speed, sendResponse);
+    handleKokoroPlay(request.text, request.voice, request.speed, request.tier, sendResponse);
     return true; // Keep message channel open for async response
   }
 

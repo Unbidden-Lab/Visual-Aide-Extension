@@ -23,7 +23,8 @@ const DEFAULT_SETTINGS = {
   ttsVoice: 'female',
   ttsVoiceGender: 'female',
   ttsSpeed: 1.0,
-  ttsRate: 1.0
+  ttsRate: 1.0,
+  ttsEngineTier: 'wasm'
 };
 
 // -------------------------------------------------------------
@@ -229,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ttsVoiceSelect = document.getElementById('tts-voice');
   const ttsVoiceTestBtn = document.getElementById('tts-voice-test-btn');
   const ttsSpeedSelect = document.getElementById('tts-speed');
+  const ttsEngineTierSelect = document.getElementById('tts-engine-tier');
 
   const levelBtns = document.querySelectorAll('.level-btn');
   const fontSelect = document.getElementById('font-family');
@@ -277,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load persisted voice and speed multiplier from sync storage
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
+      chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], (syncRes) => {
         const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
         if (syncVoice) {
           currentSettings.ttsVoice = syncVoice;
@@ -291,6 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
           currentSettings.ttsRate = s;
           if (ttsSpeedSelect) ttsSpeedSelect.value = s.toString();
         }
+        const syncTier = syncRes?.ttsEngineTier || 'wasm';
+        currentSettings.ttsEngineTier = syncTier;
+        if (ttsEngineTierSelect) ttsEngineTierSelect.value = syncTier;
       });
     }
 
@@ -478,8 +483,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showKokoroBanner(targetVoice) {
     pendingKokoroVoice = targetVoice;
+    const isTurbo = (currentSettings.ttsEngineTier === 'webgpu');
     if (kokoroDesc) {
-      kokoroDesc.textContent = 'Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.';
+      kokoroDesc.textContent = isTurbo
+        ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit precision on your GPU for instant generation.'
+        : 'Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.';
     }
     if (kokoroBanner) {
       kokoroBanner.classList.remove('hidden');
@@ -559,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
               kokoroProgressText.textContent = 'Kokoro Studio Ready!';
             }
           }
-        });
+        }, currentSettings.ttsEngineTier || 'wasm');
 
         if (kokoroProgressFill) kokoroProgressFill.style.width = '100%';
         if (kokoroProgressText) kokoroProgressText.textContent = 'Kokoro Studio Ready!';
@@ -590,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const chosen = e.target.value;
 
       if (isKokoroVoice(chosen)) {
-        const cached = await isKokoroModelCached();
+        const cached = await isKokoroModelCached(currentSettings.ttsEngineTier || 'wasm');
         if (!cached) {
           showKokoroBanner(chosen);
           return;
@@ -598,6 +606,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       applyVoiceSetting(chosen);
+    });
+  }
+
+  // TTS Engine Tier Selector (Universal WASM vs Turbo WebGPU)
+  if (ttsEngineTierSelect) {
+    ttsEngineTierSelect.addEventListener('change', async (e) => {
+      const chosenTier = e.target.value;
+      if (chosenTier === 'webgpu') {
+        const supported = await isWebGpuSupported();
+        if (!supported) {
+          alert('WebGPU is not supported or enabled on your system. Reverting to Lightweight Mode (CPU).');
+          ttsEngineTierSelect.value = 'wasm';
+          currentSettings.ttsEngineTier = 'wasm';
+          saveSettings({ ttsEngineTier: 'wasm' });
+          return;
+        }
+      }
+
+      currentSettings.ttsEngineTier = chosenTier;
+      saveSettings({ ttsEngineTier: chosenTier });
+
+      const currentVoice = currentSettings.ttsVoice || 'female';
+      if (isKokoroVoice(currentVoice)) {
+        const cached = await isKokoroModelCached(chosenTier);
+        if (!cached) {
+          showKokoroBanner(currentVoice);
+        }
+      }
     });
   }
 
@@ -624,6 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await playKokoroAudio(text, {
             voice: chosenVoice,
             speed: speedVal,
+            tier: currentSettings.ttsEngineTier || 'wasm',
             onStart: () => {
               ttsVoiceTestBtn.textContent = 'Stop';
             },
@@ -755,6 +792,9 @@ document.addEventListener('DOMContentLoaded', () => {
         syncObj.ttsSpeed = toSave.ttsSpeed;
         syncObj.ttsRate = toSave.ttsSpeed;
       }
+      if (toSave.ttsEngineTier) {
+        syncObj.ttsEngineTier = toSave.ttsEngineTier;
+      }
       chrome.storage.sync.set(syncObj);
     }
   }
@@ -775,6 +815,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSettings.ttsSpeed = s;
         currentSettings.ttsRate = s;
         if (ttsSpeedSelect) ttsSpeedSelect.value = s.toString();
+      }
+      if (changes.ttsEngineTier) {
+        const t = changes.ttsEngineTier.newValue || 'wasm';
+        currentSettings.ttsEngineTier = t;
+        if (ttsEngineTierSelect) ttsEngineTierSelect.value = t;
       }
     }
     if (area === 'local' && changes.va_settings && changes.va_settings.newValue) {
@@ -1021,6 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await playKokoroAudio(activeWord, {
               voice: currentVoice,
               speed: speedVal,
+              tier: currentSettings.ttsEngineTier || 'wasm',
               onEnd: () => {
                 speakBtn.textContent = 'Listen';
               },

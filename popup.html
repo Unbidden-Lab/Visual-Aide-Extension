@@ -324,6 +324,20 @@
           </select>
         </div>
 
+        <!-- Neural Engine Tier Selector -->
+        <div class="slider-group" style="margin-top: 10px;">
+          <div class="label-row">
+            <label for="tts-engine-tier">
+              Neural Engine Tier
+              <button type="button" class="info-help-btn" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) for universal compatibility or Turbo Mode (GPU / ~330 MB) for instant playback" aria-label="Learn about Neural Engine Tier">?</button>
+            </label>
+          </div>
+          <select id="tts-engine-tier" class="custom-select">
+            <option value="wasm">Lightweight Mode (CPU / ~85 MB)</option>
+            <option value="webgpu">Turbo Mode (GPU / ~330 MB)</option>
+          </select>
+        </div>
+
       </div>
 
       <!-- Simplified Dictionary -->

@@ -51,7 +51,8 @@ let currentReaderSettings = {
   bionic: false,
   ruler: false,
   ttsVoice: 'female',
-  ttsSpeed: 1.0
+  ttsSpeed: 1.0,
+  ttsEngineTier: 'wasm'
 };
 
 // -------------------------------------------------------------
@@ -275,9 +276,9 @@ function initNetworkStatus() {
 // Settings Initialization & Sync with Extension
 // -------------------------------------------------------------
 function initSettingsSync() {
-  // Query sync storage for voice and speed selection
+  // Query sync storage for voice, speed, and tier selection
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate'], (syncRes) => {
+    chrome.storage.sync.get(['ttsVoice', 'ttsVoiceGender', 'ttsSpeed', 'ttsRate', 'ttsEngineTier'], (syncRes) => {
       const syncVoice = syncRes?.ttsVoice || syncRes?.ttsVoiceGender;
       if (syncVoice) {
         currentReaderSettings.ttsVoice = syncVoice;
@@ -290,6 +291,10 @@ function initSettingsSync() {
         const speedSelect = document.getElementById('reader-tts-speed');
         if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
       }
+      const syncTier = syncRes?.ttsEngineTier || 'wasm';
+      currentReaderSettings.ttsEngineTier = syncTier;
+      const tierSelect = document.getElementById('reader-tts-engine-tier');
+      if (tierSelect) tierSelect.value = syncTier;
     });
   }
 
@@ -312,6 +317,7 @@ function initSettingsSync() {
     if (s.ruler !== undefined) currentReaderSettings.ruler = s.ruler;
     if (s.ttsVoice) currentReaderSettings.ttsVoice = s.ttsVoice;
     if (s.ttsSpeed !== undefined && s.ttsSpeed !== null) currentReaderSettings.ttsSpeed = parseFloat(s.ttsSpeed);
+    if (s.ttsEngineTier) currentReaderSettings.ttsEngineTier = s.ttsEngineTier;
     applyAllReaderStyles();
     updateToolbarUI();
   };
@@ -353,6 +359,12 @@ function initSettingsSync() {
               if (speedSelect) speedSelect.value = currentReaderSettings.ttsSpeed.toString();
             }
           }
+          if (changes.ttsEngineTier) {
+            const syncTier = changes.ttsEngineTier?.newValue || 'wasm';
+            currentReaderSettings.ttsEngineTier = syncTier;
+            const tierSelect = document.getElementById('reader-tts-engine-tier');
+            if (tierSelect) tierSelect.value = syncTier;
+          }
         }
         if (area === 'local') {
           if (changes.va_reader_settings && changes.va_reader_settings.newValue) {
@@ -376,13 +388,14 @@ function saveReaderSettings() {
   } catch (e) {}
 
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    // Save voice and speed to sync storage
+    // Save voice, speed, and tier to sync storage
     if (chrome.storage.sync) {
       chrome.storage.sync.set({
         ttsVoice: currentReaderSettings.ttsVoice || 'female',
         ttsVoiceGender: currentReaderSettings.ttsVoice || 'female',
         ttsSpeed: currentReaderSettings.ttsSpeed || 1.0,
-        ttsRate: currentReaderSettings.ttsSpeed || 1.0
+        ttsRate: currentReaderSettings.ttsSpeed || 1.0,
+        ttsEngineTier: currentReaderSettings.ttsEngineTier || 'wasm'
       }, () => {
         if (chrome.runtime && chrome.runtime.lastError) {
           console.warn('Sync storage warning:', chrome.runtime.lastError.message);
@@ -407,6 +420,7 @@ function saveReaderSettings() {
         existing.ttsVoiceGender = currentReaderSettings.ttsVoice || 'female';
         existing.ttsSpeed = currentReaderSettings.ttsSpeed || 1.0;
         existing.ttsRate = currentReaderSettings.ttsSpeed || 1.0;
+        existing.ttsEngineTier = currentReaderSettings.ttsEngineTier || 'wasm';
         try {
           localStorage.setItem('va_settings', JSON.stringify(existing));
         } catch (e) {}
@@ -536,6 +550,7 @@ function initToolbarControls() {
   let previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
 
   const readerKokoroModal = document.getElementById('reader-kokoro-modal');
+  const readerKokoroDesc = document.getElementById('reader-kokoro-desc');
   const readerKokoroProgressContainer = document.getElementById('reader-kokoro-progress-container');
   const readerKokoroProgressFill = document.getElementById('reader-kokoro-progress-fill');
   const readerKokoroProgressText = document.getElementById('reader-kokoro-progress-text');
@@ -548,6 +563,12 @@ function initToolbarControls() {
 
   function showReaderKokoroModal(targetVoice) {
     pendingReaderKokoroVoice = targetVoice;
+    const isTurbo = (currentReaderSettings.ttsEngineTier === 'webgpu');
+    if (readerKokoroDesc) {
+      readerKokoroDesc.textContent = isTurbo
+        ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit precision on your GPU for instant generation.'
+        : 'Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.';
+    }
     if (readerKokoroModal) readerKokoroModal.classList.remove('hidden');
     if (readerKokoroActions) readerKokoroActions.classList.remove('hidden');
     if (readerKokoroProgressContainer) readerKokoroProgressContainer.classList.add('hidden');
@@ -604,7 +625,7 @@ function initToolbarControls() {
               readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
             }
           }
-        });
+        }, currentReaderSettings.ttsEngineTier || 'wasm');
 
         if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '100%';
         if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
@@ -635,7 +656,7 @@ function initToolbarControls() {
     voiceSelect.addEventListener('change', async (e) => {
       const chosen = e.target.value;
       if (isKokoroVoice(chosen)) {
-        const cached = await isKokoroModelCached();
+        const cached = await isKokoroModelCached(currentReaderSettings.ttsEngineTier || 'wasm');
         if (!cached) {
           showReaderKokoroModal(chosen);
           return;
@@ -654,6 +675,35 @@ function initToolbarControls() {
     speedSelect.addEventListener('change', (e) => {
       currentReaderSettings.ttsSpeed = parseFloat(e.target.value) || 1.0;
       saveReaderSettings();
+    });
+  }
+
+  // TTS Engine Tier selector (Universal WASM vs Turbo WebGPU)
+  const readerTierSelect = document.getElementById('reader-tts-engine-tier');
+  if (readerTierSelect) {
+    readerTierSelect.addEventListener('change', async (e) => {
+      const chosenTier = e.target.value;
+      if (chosenTier === 'webgpu') {
+        const supported = await isWebGpuSupported();
+        if (!supported) {
+          alert('WebGPU is not supported or enabled on your system. Reverting to Lightweight Mode (CPU).');
+          readerTierSelect.value = 'wasm';
+          currentReaderSettings.ttsEngineTier = 'wasm';
+          saveReaderSettings();
+          return;
+        }
+      }
+
+      currentReaderSettings.ttsEngineTier = chosenTier;
+      saveReaderSettings();
+
+      const currentVoice = currentReaderSettings.ttsVoice || 'female';
+      if (isKokoroVoice(currentVoice)) {
+        const cached = await isKokoroModelCached(chosenTier);
+        if (!cached) {
+          showReaderKokoroModal(currentVoice);
+        }
+      }
     });
   }
 
@@ -719,6 +769,9 @@ function updateToolbarUI() {
 
   const speedEl = document.getElementById('reader-tts-speed');
   if (speedEl) speedEl.value = (currentReaderSettings.ttsSpeed || 1.0).toString();
+
+  const tierEl = document.getElementById('reader-tts-engine-tier');
+  if (tierEl) tierEl.value = currentReaderSettings.ttsEngineTier || 'wasm';
 }
 
 function applyAllReaderStyles() {
@@ -1410,6 +1463,7 @@ async function playNextReaderTtsChunk() {
       await playKokoroAudio(chunk, {
         voice: activeVoice,
         speed: speedVal,
+        tier: currentReaderSettings.ttsEngineTier || 'wasm',
         onStart: () => {
           setReaderTtsGenerating(false);
           updateReaderTtsUi(true);
@@ -1487,6 +1541,8 @@ function handleTtsPlay() {
   }
 
   const activeVoice = currentReaderSettings.ttsVoice || 'female';
+  const speedVal = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
+  const tierVal = currentReaderSettings.ttsEngineTier || 'wasm';
 
   // Kokoro playback controls (Play / Pause / Resume)
   if (isKokoroVoice(activeVoice)) {
@@ -1522,6 +1578,7 @@ function handleTtsPlay() {
     playKokoroAudio(textToRead, {
       voice: activeVoice,
       speed: speedVal,
+      tier: tierVal,
       onStart: () => {
         setReaderTtsGenerating(false);
         updateReaderTtsUi(true);
@@ -1726,6 +1783,7 @@ async function openDictionaryModal(word) {
           await playKokoroAudio(entry.word, {
             voice: activeVoice,
             speed: speedVal,
+            tier: currentReaderSettings.ttsEngineTier || 'wasm',
             onEnd: () => { ttsBtn.textContent = 'Listen'; },
             onError: () => { ttsBtn.textContent = 'Listen'; }
           });
