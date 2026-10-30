@@ -84,7 +84,20 @@ async function loadKokoroModel(progressCallback) {
       ? chrome.runtime.getURL('lib/kokoro.web.js')
       : './lib/kokoro.web.js';
 
-    const { KokoroTTS } = await import(libUrl);
+    const { KokoroTTS, env } = await import(libUrl);
+
+    const localOrtPath = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL)
+      ? chrome.runtime.getURL('lib/ort/')
+      : './lib/ort/';
+
+    if (env) {
+      env.wasmPaths = localOrtPath;
+      if (env.backends && env.backends.onnx && env.backends.onnx.wasm) {
+        env.backends.onnx.wasm.wasmPaths = localOrtPath;
+        env.backends.onnx.wasm.numThreads = 1;
+        env.backends.onnx.wasm.proxy = false;
+      }
+    }
 
     // Initialize quantized Q8 model as specified
     const tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
