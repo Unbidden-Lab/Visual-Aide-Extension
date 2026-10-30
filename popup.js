@@ -296,6 +296,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const syncTier = syncRes?.ttsEngineTier || 'wasm';
         currentSettings.ttsEngineTier = syncTier;
         if (ttsEngineTierSelect) ttsEngineTierSelect.value = syncTier;
+        previousTier = syncTier;
+        previousVoice = currentSettings.ttsVoice || 'female';
+        updateNeuralTierVisibility(currentSettings.ttsVoice);
       });
     }
 
@@ -470,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Kokoro Studio Model Download & Confirmation Elements
   let previousVoice = currentSettings.ttsVoice || 'female';
+  let previousTier = currentSettings.ttsEngineTier || 'wasm';
   const kokoroBanner = document.getElementById('kokoro-confirm-banner');
   const kokoroDesc = document.getElementById('kokoro-confirm-desc');
   const kokoroProgressContainer = document.getElementById('kokoro-progress-container');
@@ -480,34 +484,90 @@ document.addEventListener('DOMContentLoaded', () => {
   const kokoroCancelBtn = document.getElementById('kokoro-cancel-btn');
 
   let pendingKokoroVoice = null;
+  let pendingKokoroTier = null;
+
+  // Grey out Neural Engine Tier if current voice is not Kokoro AI
+  function updateNeuralTierVisibility(voiceId) {
+    const isKokoro = isKokoroVoice(voiceId || currentSettings.ttsVoice);
+    const tierGroup = document.getElementById('tts-engine-tier-group');
+    if (!tierGroup) return;
+
+    if (isKokoro) {
+      tierGroup.classList.remove('tier-disabled');
+      if (ttsEngineTierSelect) {
+        ttsEngineTierSelect.disabled = false;
+        ttsEngineTierSelect.removeAttribute('aria-disabled');
+      }
+    } else {
+      tierGroup.classList.add('tier-disabled');
+      if (ttsEngineTierSelect) {
+        ttsEngineTierSelect.disabled = true;
+        ttsEngineTierSelect.setAttribute('aria-disabled', 'true');
+      }
+    }
+  }
+
+  // Reinitialize the extension neural engine and background offscreen worker
+  async function reinitializeExtensionEngine(targetTier) {
+    try {
+      await loadKokoroModel(null, targetTier);
+    } catch (e) {
+      console.warn('Kokoro engine reinitialization notice:', e);
+    }
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      chrome.runtime.sendMessage({
+        action: 'BG_KOKORO_REINIT',
+        tier: targetTier
+      }).catch(() => {});
+    }
+  }
 
   function showKokoroBanner(targetVoice) {
     pendingKokoroVoice = targetVoice;
+    pendingKokoroTier = null;
     const isTurbo = (currentSettings.ttsEngineTier === 'webgpu');
+    const bannerTitle = document.getElementById('kokoro-confirm-title');
+    if (bannerTitle) {
+      bannerTitle.textContent = isTurbo
+        ? 'Kokoro Studio Turbo Mode (GPU / ~330 MB)'
+        : 'Kokoro Studio Neural Voice';
+    }
     if (kokoroDesc) {
       kokoroDesc.textContent = isTurbo
         ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit precision on your GPU for instant generation.'
         : 'Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.';
     }
-    if (kokoroBanner) {
-      kokoroBanner.classList.remove('hidden');
+    if (kokoroBanner) kokoroBanner.classList.remove('hidden');
+    if (kokoroActions) kokoroActions.classList.remove('hidden');
+    if (kokoroProgressContainer) kokoroProgressContainer.classList.add('hidden');
+    if (kokoroProgressFill) kokoroProgressFill.style.width = '0%';
+  }
+
+  function showKokoroBannerForTier(targetTier) {
+    pendingKokoroTier = targetTier;
+    pendingKokoroVoice = null;
+    const isTurbo = (targetTier === 'webgpu');
+    const bannerTitle = document.getElementById('kokoro-confirm-title');
+    if (bannerTitle) {
+      bannerTitle.textContent = isTurbo
+        ? 'Kokoro Studio Turbo Mode (GPU / ~330 MB)'
+        : 'Kokoro Studio Lightweight Mode (CPU / ~85 MB)';
     }
-    if (kokoroActions) {
-      kokoroActions.classList.remove('hidden');
+    if (kokoroDesc) {
+      kokoroDesc.textContent = isTurbo
+        ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit floating-point weights on your GPU for near-instant generation.'
+        : 'Download Kokoro Studio Voice Lightweight Mode (~85 MB)? Runs 100% locally on your CPU with 8-bit quantized weights.';
     }
-    if (kokoroProgressContainer) {
-      kokoroProgressContainer.classList.add('hidden');
-    }
-    if (kokoroProgressFill) {
-      kokoroProgressFill.style.width = '0%';
-    }
+    if (kokoroBanner) kokoroBanner.classList.remove('hidden');
+    if (kokoroActions) kokoroActions.classList.remove('hidden');
+    if (kokoroProgressContainer) kokoroProgressContainer.classList.add('hidden');
+    if (kokoroProgressFill) kokoroProgressFill.style.width = '0%';
   }
 
   function hideKokoroBanner() {
-    if (kokoroBanner) {
-      kokoroBanner.classList.add('hidden');
-    }
+    if (kokoroBanner) kokoroBanner.classList.add('hidden');
     pendingKokoroVoice = null;
+    pendingKokoroTier = null;
   }
 
   function applyVoiceSetting(voiceId) {
@@ -517,6 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ttsVoiceSelect) {
       ttsVoiceSelect.value = voiceId;
     }
+    updateNeuralTierVisibility(voiceId);
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
       chrome.storage.sync.set({ ttsVoice: voiceId, ttsVoiceGender: currentSettings.ttsVoiceGender }, () => {
         if (chrome.runtime && chrome.runtime.lastError) {
@@ -529,10 +590,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (kokoroCancelBtn) {
     kokoroCancelBtn.addEventListener('click', () => {
-      hideKokoroBanner();
-      if (ttsVoiceSelect) {
+      if (pendingKokoroTier && ttsEngineTierSelect) {
+        ttsEngineTierSelect.value = previousTier;
+      }
+      if (pendingKokoroVoice && ttsVoiceSelect) {
         ttsVoiceSelect.value = previousVoice;
       }
+      hideKokoroBanner();
     });
   }
 
@@ -541,6 +605,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (kokoroActions) kokoroActions.classList.add('hidden');
       if (kokoroProgressContainer) kokoroProgressContainer.classList.remove('hidden');
       if (kokoroProgressText) kokoroProgressText.textContent = 'Connecting to model repository...';
+
+      const tierToDownload = pendingKokoroTier || currentSettings.ttsEngineTier || 'wasm';
 
       try {
         await loadKokoroModel((info) => {
@@ -562,31 +628,46 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (info.status === 'progress' || info.status === 'download') {
               kokoroProgressText.textContent = `Downloading Kokoro Studio Model... ${pct}%`;
             } else if (info.status === 'done') {
-              kokoroProgressText.textContent = 'Model download complete. Initializing...';
+              kokoroProgressText.textContent = 'Model download complete. Initializing engine...';
             } else if (info.status === 'ready') {
               kokoroProgressText.textContent = 'Kokoro Studio Ready!';
             }
           }
-        }, currentSettings.ttsEngineTier || 'wasm');
+        }, tierToDownload);
 
         if (kokoroProgressFill) kokoroProgressFill.style.width = '100%';
-        if (kokoroProgressText) kokoroProgressText.textContent = 'Kokoro Studio Ready!';
+        if (kokoroProgressText) kokoroProgressText.textContent = 'Kokoro Studio Ready! Engine reinitialized.';
+
+        if (pendingKokoroTier) {
+          currentSettings.ttsEngineTier = pendingKokoroTier;
+          previousTier = pendingKokoroTier;
+          if (ttsEngineTierSelect) ttsEngineTierSelect.value = pendingKokoroTier;
+          saveSettings({ ttsEngineTier: pendingKokoroTier });
+        }
+
+        if (pendingKokoroVoice) {
+          applyVoiceSetting(pendingKokoroVoice);
+        }
+
+        // Reinitialize the extension neural engine
+        await reinitializeExtensionEngine(tierToDownload);
 
         setTimeout(() => {
           hideKokoroBanner();
         }, 1200);
-
-        applyVoiceSetting(pendingKokoroVoice || 'af_heart');
       } catch (err) {
         console.error('Kokoro download error:', err);
         if (kokoroProgressText) {
           kokoroProgressText.textContent = 'Download failed. Please check internet connection.';
         }
         setTimeout(() => {
-          hideKokoroBanner();
-          if (ttsVoiceSelect) {
+          if (pendingKokoroTier && ttsEngineTierSelect) {
+            ttsEngineTierSelect.value = previousTier;
+          }
+          if (pendingKokoroVoice && ttsVoiceSelect) {
             ttsVoiceSelect.value = previousVoice;
           }
+          hideKokoroBanner();
         }, 2200);
       }
     });
@@ -596,6 +677,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (ttsVoiceSelect) {
     ttsVoiceSelect.addEventListener('change', async (e) => {
       const chosen = e.target.value;
+      updateNeuralTierVisibility(chosen);
 
       if (isKokoroVoice(chosen)) {
         const cached = await isKokoroModelCached(currentSettings.ttsEngineTier || 'wasm');
@@ -613,26 +695,50 @@ document.addEventListener('DOMContentLoaded', () => {
   if (ttsEngineTierSelect) {
     ttsEngineTierSelect.addEventListener('change', async (e) => {
       const chosenTier = e.target.value;
+
       if (chosenTier === 'webgpu') {
+        // 1. Hardware & browser capability check for WebGPU
         const supported = await isWebGpuSupported();
         if (!supported) {
-          alert('WebGPU is not supported or enabled on your system. Reverting to Lightweight Mode (CPU).');
+          alert('WebGPU acceleration is not supported or enabled on your system or graphics hardware. Reverting to Lightweight Mode (CPU).');
           ttsEngineTierSelect.value = 'wasm';
           currentSettings.ttsEngineTier = 'wasm';
+          previousTier = 'wasm';
           saveSettings({ ttsEngineTier: 'wasm' });
           return;
         }
+
+        // 2. WebGPU checks passed! Check if FP32 model is cached
+        const cached = await isKokoroModelCached('webgpu');
+        if (!cached) {
+          // Automatically prompt user to download the FP32 model (~330 MB)
+          showKokoroBannerForTier('webgpu');
+          return;
+        }
+
+        // Already cached: switch tier and reinitialize extension
+        currentSettings.ttsEngineTier = 'webgpu';
+        previousTier = 'webgpu';
+        saveSettings({ ttsEngineTier: 'webgpu' });
+        await reinitializeExtensionEngine('webgpu');
+        return;
       }
 
-      currentSettings.ttsEngineTier = chosenTier;
-      saveSettings({ ttsEngineTier: chosenTier });
-
-      const currentVoice = currentSettings.ttsVoice || 'female';
-      if (isKokoroVoice(currentVoice)) {
-        const cached = await isKokoroModelCached(chosenTier);
+      if (chosenTier === 'wasm') {
+        // Check if q8 model is cached
+        const cached = await isKokoroModelCached('wasm');
         if (!cached) {
-          showKokoroBanner(currentVoice);
+          // Automatically prompt user to download the lightweight q8 model (~85 MB)
+          showKokoroBannerForTier('wasm');
+          return;
         }
+
+        // Already cached: switch tier and reinitialize extension
+        currentSettings.ttsEngineTier = 'wasm';
+        previousTier = 'wasm';
+        saveSettings({ ttsEngineTier: 'wasm' });
+        await reinitializeExtensionEngine('wasm');
+        return;
       }
     });
   }
@@ -762,6 +868,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ttsVoiceSelect) {
       ttsVoiceSelect.value = settings.ttsVoice || settings.ttsVoiceGender || 'female';
     }
+    if (ttsEngineTierSelect) {
+      ttsEngineTierSelect.value = settings.ttsEngineTier || 'wasm';
+    }
+    previousTier = settings.ttsEngineTier || 'wasm';
+    updateNeuralTierVisibility(settings.ttsVoice || settings.ttsVoiceGender || 'female');
     if (ttsSpeedSelect) {
       ttsSpeedSelect.value = (settings.ttsSpeed || settings.ttsRate || 1.0).toString();
     }
@@ -807,7 +918,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (v) {
           currentSettings.ttsVoice = v;
           currentSettings.ttsVoiceGender = v;
+          previousVoice = v;
           if (ttsVoiceSelect) ttsVoiceSelect.value = v;
+          updateNeuralTierVisibility(v);
         }
       }
       if (changes.ttsSpeed || changes.ttsRate) {

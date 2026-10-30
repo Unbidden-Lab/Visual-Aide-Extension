@@ -291,7 +291,7 @@
           <!-- Kokoro Studio Model Download / Confirmation Banner -->
           <div id="kokoro-confirm-banner" class="kokoro-banner hidden" role="region" aria-live="polite">
             <div class="kokoro-banner-content">
-              <span class="kokoro-banner-title">Kokoro Studio Neural Voice</span>
+              <span class="kokoro-banner-title" id="kokoro-confirm-title">Kokoro Studio Neural Voice</span>
               <p id="kokoro-confirm-desc" class="kokoro-banner-desc">Download Kokoro Studio Voice (~85 MB)? Runs 100% locally and offline on your device.</p>
               <div id="kokoro-progress-container" class="kokoro-progress-container hidden">
                 <div class="kokoro-progress-track">
@@ -307,36 +307,48 @@
           </div>
         </div>
 
-        <!-- Speech Speed Multiplier -->
-        <div class="slider-group" style="margin-top: 10px;">
-          <div class="label-row">
-            <label for="tts-speed">
-              Speech Speed
-              <button type="button" class="info-help-btn" data-tooltip-title="Speech Speed" data-tooltip-desc="Adjust reading rate multiplier from slower to faster speech" aria-label="Learn about Speech Speed">?</button>
-            </label>
-          </div>
-          <select id="tts-speed" class="custom-select">
-            <option value="0.75">0.75x</option>
-            <option value="0.9">0.9x</option>
-            <option value="1.0">1.0x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-          </select>
-        </div>
+        <!-- Collapsible Advanced Speech Settings Accordion -->
+        <details class="advanced-accordion" id="advanced-speech-details">
+          <summary class="advanced-summary">
+            <span class="advanced-summary-title">
+              Advanced Speech Settings
+              <button type="button" class="info-help-btn" data-tooltip-title="Advanced Speech Settings" data-tooltip-desc="Configure speech speed multiplier and offline neural acceleration tiers" aria-label="Learn about Advanced Speech Settings">?</button>
+            </span>
+            <span class="advanced-summary-chevron"></span>
+          </summary>
+          <div class="advanced-content">
+            <!-- Speech Speed Multiplier -->
+            <div class="slider-group">
+              <div class="label-row">
+                <label for="tts-speed">
+                  Speech Speed
+                  <button type="button" class="info-help-btn" data-tooltip-title="Speech Speed" data-tooltip-desc="Adjust reading rate multiplier from slower to faster speech" aria-label="Learn about Speech Speed">?</button>
+                </label>
+              </div>
+              <select id="tts-speed" class="custom-select">
+                <option value="0.75">0.75x</option>
+                <option value="0.9">0.9x</option>
+                <option value="1.0">1.0x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+              </select>
+            </div>
 
-        <!-- Neural Engine Tier Selector -->
-        <div class="slider-group" style="margin-top: 10px;">
-          <div class="label-row">
-            <label for="tts-engine-tier">
-              Neural Engine Tier
-              <button type="button" class="info-help-btn" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) for universal compatibility or Turbo Mode (GPU / ~330 MB) for instant playback" aria-label="Learn about Neural Engine Tier">?</button>
-            </label>
+            <!-- Neural Engine Tier Selector -->
+            <div class="slider-group" id="tts-engine-tier-group">
+              <div class="label-row">
+                <label for="tts-engine-tier">
+                  Neural Engine Tier
+                  <button type="button" class="info-help-btn" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) for universal compatibility or Turbo Mode (GPU / ~330 MB) for instant playback" aria-label="Learn about Neural Engine Tier">?</button>
+                </label>
+              </div>
+              <select id="tts-engine-tier" class="custom-select">
+                <option value="wasm">Lightweight Mode (CPU / ~85 MB)</option>
+                <option value="webgpu">Turbo Mode (GPU / ~330 MB)</option>
+              </select>
+            </div>
           </div>
-          <select id="tts-engine-tier" class="custom-select">
-            <option value="wasm">Lightweight Mode (CPU / ~85 MB)</option>
-            <option value="webgpu">Turbo Mode (GPU / ~330 MB)</option>
-          </select>
-        </div>
+        </details>
 
       </div>
 

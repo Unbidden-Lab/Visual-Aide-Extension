@@ -97,5 +97,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  if (request.action === 'OFFSCREEN_KOKORO_REINIT') {
+    (async () => {
+      try {
+        if (typeof KokoroEngine !== 'undefined') {
+          KokoroEngine.stopKokoroAudio();
+          await KokoroEngine.loadKokoroModel(null, request.tier || 'wasm');
+        }
+        sendResponse({ ok: true, tier: request.tier || 'wasm' });
+      } catch (err) {
+        console.warn('Offscreen reinit error:', err);
+        sendResponse({ ok: false, error: err.message || String(err) });
+      }
+    })();
+    return true;
+  }
+
   return false;
 });

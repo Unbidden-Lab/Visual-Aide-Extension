@@ -1085,3 +1085,16 @@ body.contrast-inverted .reader-tooltip-desc {
   color: #aaaaaa;
   margin-top: 6px;
 }
+
+/* Neural Engine Tier Disabled / Greyed out state */
+.tool-item.tier-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+  filter: grayscale(0.8);
+  user-select: none;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.tool-item.tier-disabled select {
+  cursor: not-allowed;
+}

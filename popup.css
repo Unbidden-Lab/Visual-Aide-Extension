@@ -871,3 +871,23 @@ input[type=range] {
   color: #ffffff;
   border-color: #666666;
 }
+
+/* Neural Engine Tier Disabled / Greyed out state when Kokoro AI is not selected */
+.tier-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+  user-select: none;
+  filter: grayscale(0.8);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.tier-disabled select {
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.tier-disabled label {
+  color: var(--text-muted);
+}

@@ -295,6 +295,9 @@ function initSettingsSync() {
       currentReaderSettings.ttsEngineTier = syncTier;
       const tierSelect = document.getElementById('reader-tts-engine-tier');
       if (tierSelect) tierSelect.value = syncTier;
+      previousReaderTier = syncTier;
+      previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
+      updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice);
     });
   }
 
@@ -347,8 +350,10 @@ function initSettingsSync() {
             const syncVoice = changes.ttsVoice?.newValue || changes.ttsVoiceGender?.newValue;
             if (syncVoice) {
               currentReaderSettings.ttsVoice = syncVoice;
+              previousReaderVoice = syncVoice;
               const voiceSelect = document.getElementById('reader-tts-voice');
               if (voiceSelect) voiceSelect.value = syncVoice;
+              updateReaderNeuralTierVisibility(syncVoice);
             }
           }
           if (changes.ttsSpeed || changes.ttsRate) {
@@ -548,6 +553,7 @@ function initToolbarControls() {
   // TTS Voice selector & Kokoro Studio Modal
   const voiceSelect = document.getElementById('reader-tts-voice');
   let previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
+  let previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
 
   const readerKokoroModal = document.getElementById('reader-kokoro-modal');
   const readerKokoroDesc = document.getElementById('reader-kokoro-desc');
@@ -560,10 +566,35 @@ function initToolbarControls() {
   const readerKokoroBackdrop = document.getElementById('reader-kokoro-backdrop');
 
   let pendingReaderKokoroVoice = null;
+  let pendingReaderKokoroTier = null;
+
+  function updateReaderNeuralTierVisibility(voiceId) {
+    const isKokoro = isKokoroVoice(voiceId || currentReaderSettings.ttsVoice);
+    const tierGroup = document.getElementById('reader-tts-engine-tier-group');
+    const tierSelect = document.getElementById('reader-tts-engine-tier');
+    if (!tierGroup || !tierSelect) return;
+
+    if (isKokoro) {
+      tierGroup.classList.remove('tier-disabled');
+      tierSelect.disabled = false;
+      tierSelect.removeAttribute('aria-disabled');
+    } else {
+      tierGroup.classList.add('tier-disabled');
+      tierSelect.disabled = true;
+      tierSelect.setAttribute('aria-disabled', 'true');
+    }
+  }
 
   function showReaderKokoroModal(targetVoice) {
     pendingReaderKokoroVoice = targetVoice;
+    pendingReaderKokoroTier = null;
     const isTurbo = (currentReaderSettings.ttsEngineTier === 'webgpu');
+    const modalTitle = document.getElementById('reader-kokoro-title');
+    if (modalTitle) {
+      modalTitle.textContent = isTurbo
+        ? 'Kokoro Studio Turbo Mode (GPU / ~330 MB)'
+        : 'Kokoro Studio Neural Voice';
+    }
     if (readerKokoroDesc) {
       readerKokoroDesc.textContent = isTurbo
         ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit precision on your GPU for instant generation.'
@@ -575,22 +606,54 @@ function initToolbarControls() {
     if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '0%';
   }
 
+  function showReaderKokoroModalForTier(targetTier) {
+    pendingReaderKokoroTier = targetTier;
+    pendingReaderKokoroVoice = null;
+    const isTurbo = (targetTier === 'webgpu');
+    const modalTitle = document.getElementById('reader-kokoro-title');
+    if (modalTitle) {
+      modalTitle.textContent = isTurbo
+        ? 'Kokoro Studio Turbo Mode (GPU / ~330 MB)'
+        : 'Kokoro Studio Lightweight Mode (CPU / ~85 MB)';
+    }
+    if (readerKokoroDesc) {
+      readerKokoroDesc.textContent = isTurbo
+        ? 'Download Kokoro Studio Voice Turbo Mode (~330 MB)? Uses full 32-bit floating-point weights on your GPU for near-instant generation.'
+        : 'Download Kokoro Studio Voice Lightweight Mode (~85 MB)? Runs 100% locally on your CPU with 8-bit quantized weights.';
+    }
+    if (readerKokoroModal) readerKokoroModal.classList.remove('hidden');
+    if (readerKokoroActions) readerKokoroActions.classList.remove('hidden');
+    if (readerKokoroProgressContainer) readerKokoroProgressContainer.classList.add('hidden');
+    if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '0%';
+  }
+
   function hideReaderKokoroModal() {
     if (readerKokoroModal) readerKokoroModal.classList.add('hidden');
     pendingReaderKokoroVoice = null;
+    pendingReaderKokoroTier = null;
   }
 
   if (readerKokoroCancelBtn) {
     readerKokoroCancelBtn.addEventListener('click', () => {
+      if (pendingReaderKokoroTier && readerTierSelect) {
+        readerTierSelect.value = previousReaderTier;
+      }
+      if (pendingReaderKokoroVoice && voiceSelect) {
+        voiceSelect.value = previousReaderVoice;
+      }
       hideReaderKokoroModal();
-      if (voiceSelect) voiceSelect.value = previousReaderVoice;
     });
   }
 
   if (readerKokoroBackdrop) {
     readerKokoroBackdrop.addEventListener('click', () => {
+      if (pendingReaderKokoroTier && readerTierSelect) {
+        readerTierSelect.value = previousReaderTier;
+      }
+      if (pendingReaderKokoroVoice && voiceSelect) {
+        voiceSelect.value = previousReaderVoice;
+      }
       hideReaderKokoroModal();
-      if (voiceSelect) voiceSelect.value = previousReaderVoice;
     });
   }
 
@@ -599,6 +662,8 @@ function initToolbarControls() {
       if (readerKokoroActions) readerKokoroActions.classList.add('hidden');
       if (readerKokoroProgressContainer) readerKokoroProgressContainer.classList.remove('hidden');
       if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Connecting to model repository...';
+
+      const tierToDownload = pendingReaderKokoroTier || currentReaderSettings.ttsEngineTier || 'wasm';
 
       try {
         await loadKokoroModel((info) => {
@@ -620,33 +685,51 @@ function initToolbarControls() {
             } else if (info.status === 'progress' || info.status === 'download') {
               readerKokoroProgressText.textContent = `Downloading Kokoro Studio Model... ${pct}%`;
             } else if (info.status === 'done') {
-              readerKokoroProgressText.textContent = 'Model download complete. Initializing...';
+              readerKokoroProgressText.textContent = 'Model download complete. Initializing engine...';
             } else if (info.status === 'ready') {
               readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
             }
           }
-        }, currentReaderSettings.ttsEngineTier || 'wasm');
+        }, tierToDownload);
 
         if (readerKokoroProgressFill) readerKokoroProgressFill.style.width = '100%';
-        if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Kokoro Studio Ready!';
+        if (readerKokoroProgressText) readerKokoroProgressText.textContent = 'Kokoro Studio Ready! Engine reinitialized.';
+
+        if (pendingReaderKokoroTier) {
+          currentReaderSettings.ttsEngineTier = pendingReaderKokoroTier;
+          previousReaderTier = pendingReaderKokoroTier;
+          if (readerTierSelect) readerTierSelect.value = pendingReaderKokoroTier;
+          saveReaderSettings();
+        }
+
+        if (pendingReaderKokoroVoice) {
+          const chosenVoice = pendingReaderKokoroVoice || 'af_heart';
+          currentReaderSettings.ttsVoice = chosenVoice;
+          previousReaderVoice = chosenVoice;
+          if (voiceSelect) voiceSelect.value = chosenVoice;
+          saveReaderSettings();
+        }
+
+        try {
+          await loadKokoroModel(null, currentReaderSettings.ttsEngineTier || 'wasm');
+        } catch (_) {}
 
         setTimeout(() => {
           hideReaderKokoroModal();
         }, 1200);
-
-        const chosenVoice = pendingReaderKokoroVoice || 'af_heart';
-        currentReaderSettings.ttsVoice = chosenVoice;
-        previousReaderVoice = chosenVoice;
-        if (voiceSelect) voiceSelect.value = chosenVoice;
-        saveReaderSettings();
       } catch (err) {
         console.error('Reader Kokoro download error:', err);
         if (readerKokoroProgressText) {
           readerKokoroProgressText.textContent = 'Download failed. Please check internet connection.';
         }
         setTimeout(() => {
+          if (pendingReaderKokoroTier && readerTierSelect) {
+            readerTierSelect.value = previousReaderTier;
+          }
+          if (pendingReaderKokoroVoice && voiceSelect) {
+            voiceSelect.value = previousReaderVoice;
+          }
           hideReaderKokoroModal();
-          if (voiceSelect) voiceSelect.value = previousReaderVoice;
         }, 2200);
       }
     });
@@ -655,6 +738,8 @@ function initToolbarControls() {
   if (voiceSelect) {
     voiceSelect.addEventListener('change', async (e) => {
       const chosen = e.target.value;
+      updateReaderNeuralTierVisibility(chosen);
+
       if (isKokoroVoice(chosen)) {
         const cached = await isKokoroModelCached(currentReaderSettings.ttsEngineTier || 'wasm');
         if (!cached) {
@@ -686,23 +771,39 @@ function initToolbarControls() {
       if (chosenTier === 'webgpu') {
         const supported = await isWebGpuSupported();
         if (!supported) {
-          alert('WebGPU is not supported or enabled on your system. Reverting to Lightweight Mode (CPU).');
+          alert('WebGPU acceleration is not supported or enabled on your system or graphics hardware. Reverting to Lightweight Mode (CPU).');
           readerTierSelect.value = 'wasm';
           currentReaderSettings.ttsEngineTier = 'wasm';
+          previousReaderTier = 'wasm';
           saveReaderSettings();
           return;
         }
+
+        const cached = await isKokoroModelCached('webgpu');
+        if (!cached) {
+          showReaderKokoroModalForTier('webgpu');
+          return;
+        }
+
+        currentReaderSettings.ttsEngineTier = 'webgpu';
+        previousReaderTier = 'webgpu';
+        saveReaderSettings();
+        try { await loadKokoroModel(null, 'webgpu'); } catch (_) {}
+        return;
       }
 
-      currentReaderSettings.ttsEngineTier = chosenTier;
-      saveReaderSettings();
-
-      const currentVoice = currentReaderSettings.ttsVoice || 'female';
-      if (isKokoroVoice(currentVoice)) {
-        const cached = await isKokoroModelCached(chosenTier);
+      if (chosenTier === 'wasm') {
+        const cached = await isKokoroModelCached('wasm');
         if (!cached) {
-          showReaderKokoroModal(currentVoice);
+          showReaderKokoroModalForTier('wasm');
+          return;
         }
+
+        currentReaderSettings.ttsEngineTier = 'wasm';
+        previousReaderTier = 'wasm';
+        saveReaderSettings();
+        try { await loadKokoroModel(null, 'wasm'); } catch (_) {}
+        return;
       }
     });
   }
@@ -772,6 +873,8 @@ function updateToolbarUI() {
 
   const tierEl = document.getElementById('reader-tts-engine-tier');
   if (tierEl) tierEl.value = currentReaderSettings.ttsEngineTier || 'wasm';
+  previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
+  updateReaderNeuralTierVisibility(currentReaderSettings.ttsVoice || 'female');
 }
 
 function applyAllReaderStyles() {
