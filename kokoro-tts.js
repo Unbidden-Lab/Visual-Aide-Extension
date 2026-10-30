@@ -45,8 +45,6 @@ function getOrCreateWorker() {
 
     kokoroWorker.onmessage = (e) => {
       const { id, type, data, blob, error, tier } = e.data || {};
-      const cb = workerCallbacks.get(id);
-      if (!cb) return;
 
       if (type === 'device_lost') {
         console.warn('Received WebGPU device_lost notification from worker, falling back to WASM:', data || '');
@@ -56,6 +54,9 @@ function getOrCreateWorker() {
         }
         return;
       }
+
+      const cb = workerCallbacks.get(id);
+      if (!cb) return;
 
       if (type === 'progress') {
         if (typeof cb.onProgress === 'function') {
@@ -74,7 +75,15 @@ function getOrCreateWorker() {
     };
 
     kokoroWorker.onerror = (err) => {
-      console.warn('Kokoro Worker error:', err);
+      const errMsg = err?.message || err?.error?.message || 'Worker initialization or runtime error';
+      const file = err?.filename || '';
+      const line = err?.lineno || '';
+      console.warn('Kokoro Worker error:', errMsg, file ? `at ${file}:${line}` : err);
+
+      for (const [id, cb] of workerCallbacks.entries()) {
+        workerCallbacks.delete(id);
+        cb.reject(new Error(`Kokoro worker failure: ${errMsg}`));
+      }
     };
 
     return kokoroWorker;
@@ -299,50 +308,17 @@ async function loadKokoroModel(progressCallback, tier = 'wasm') {
       try {
         console.log('Loading Kokoro Turbo Mode (WebGPU / fp32)...');
 
+        let adapter = null;
         if (typeof navigator !== 'undefined' && navigator.gpu) {
-          const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-          if (adapter) {
-            const requiredLimits = {};
-            if (adapter.limits?.maxBufferSize) {
-              requiredLimits.maxBufferSize = adapter.limits.maxBufferSize;
-            }
-            if (adapter.limits?.maxStorageBufferBindingSize) {
-              requiredLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
-            }
-
-            const requiredFeatures = [];
-            if (adapter.features?.has('shader-f16')) {
-              requiredFeatures.push('shader-f16');
-            }
-
-            const device = await adapter.requestDevice({
-              requiredLimits,
-              requiredFeatures
-            });
-
-            device.lost.then(async (info) => {
-              console.warn('Main thread WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
-              if (info.reason !== 'destroyed') {
-                kokoroTtsInstance = null;
-                kokoroModelInitPromise = null;
-                currentLoadedTier = 'wasm';
-                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                  chrome.storage.sync.set({ ttsEngineTier: 'wasm' });
-                }
-              }
-            });
-
-            if (!globalThis.ort) globalThis.ort = {};
-            if (!globalThis.ort.env) globalThis.ort.env = {};
-            if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
-            globalThis.ort.env.webgpu.device = device;
-            globalThis.ort.env.webgpu.adapter = adapter;
-
-            if (env && env.backends && env.backends.onnx) {
+          try {
+            adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+            if (adapter && env?.backends?.onnx) {
               if (!env.backends.onnx.webgpu) env.backends.onnx.webgpu = {};
-              env.backends.onnx.webgpu.device = device;
               env.backends.onnx.webgpu.adapter = adapter;
+              env.backends.onnx.webgpu.powerPreference = 'high-performance';
             }
+          } catch (adapterErr) {
+            console.warn('Failed to query high-performance GPU adapter:', adapterErr);
           }
         }
 
@@ -353,6 +329,28 @@ async function loadKokoroModel(progressCallback, tier = 'wasm') {
             if (typeof progressCallback === 'function') progressCallback(info);
           }
         });
+
+        const activeDevice = env?.backends?.onnx?.webgpu?.device;
+        if (activeDevice) {
+          if (!globalThis.ort) globalThis.ort = {};
+          if (!globalThis.ort.env) globalThis.ort.env = {};
+          if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
+          globalThis.ort.env.webgpu.device = activeDevice;
+          if (adapter) globalThis.ort.env.webgpu.adapter = adapter;
+
+          activeDevice.lost.then(async (info) => {
+            console.warn('Main thread WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
+            if (info.reason !== 'destroyed') {
+              kokoroTtsInstance = null;
+              kokoroModelInitPromise = null;
+              currentLoadedTier = 'wasm';
+              if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                chrome.storage.sync.set({ ttsEngineTier: 'wasm' });
+              }
+            }
+          });
+        }
+
         currentLoadedTier = 'webgpu';
       } catch (gpuErr) {
         console.warn('WebGPU Turbo Mode failed, falling back to Lightweight WASM:', gpuErr);

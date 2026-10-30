@@ -49,66 +49,17 @@ async function getOrInitTts(tier = 'wasm', progressCallback) {
       try {
         console.log('Initializing Kokoro Turbo Mode (WebGPU / fp32)...');
 
-        // Forward actual adapter limits to requestDevice so Chromium does not clamp buffer sizes
+        let adapter = null;
         if (typeof navigator !== 'undefined' && navigator.gpu) {
-          const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-          if (adapter) {
-            const requiredLimits = {};
-            if (adapter.limits?.maxBufferSize) {
-              requiredLimits.maxBufferSize = adapter.limits.maxBufferSize;
-            }
-            if (adapter.limits?.maxStorageBufferBindingSize) {
-              requiredLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
-            }
-
-            const requiredFeatures = [];
-            if (adapter.features?.has('shader-f16')) {
-              requiredFeatures.push('shader-f16');
-            }
-
-            const device = await adapter.requestDevice({
-              requiredLimits,
-              requiredFeatures
-            });
-
-            // Runtime driver crash recovery (device.lost listener)
-            device.lost.then(async (info) => {
-              console.warn('WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
-              if (info.reason !== 'destroyed') {
-                currentTtsInstance = null;
-                initPromise = null;
-                currentTier = 'wasm';
-                if (globalThis.ort?.env?.webgpu) delete globalThis.ort.env.webgpu.device;
-                if (env?.backends?.onnx?.webgpu) delete env.backends.onnx.webgpu.device;
-
-                try {
-                  console.log('Recovering from GPU crash: switching Kokoro to Lightweight WASM mode...');
-                  await getOrInitTts('wasm');
-                } catch (recErr) {
-                  console.error('WASM recovery failed:', recErr);
-                }
-
-                self.postMessage({
-                  type: 'device_lost',
-                  reason: info.reason,
-                  message: info.message || 'GPU driver reset / TDR crash',
-                  fallbackTier: 'wasm'
-                });
-              }
-            });
-
-            // Explicitly assign resulting device to ort.env.webgpu.device
-            if (!globalThis.ort) globalThis.ort = {};
-            if (!globalThis.ort.env) globalThis.ort.env = {};
-            if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
-            globalThis.ort.env.webgpu.device = device;
-            globalThis.ort.env.webgpu.adapter = adapter;
-
-            if (env && env.backends && env.backends.onnx) {
+          try {
+            adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+            if (adapter && env?.backends?.onnx) {
               if (!env.backends.onnx.webgpu) env.backends.onnx.webgpu = {};
-              env.backends.onnx.webgpu.device = device;
               env.backends.onnx.webgpu.adapter = adapter;
+              env.backends.onnx.webgpu.powerPreference = 'high-performance';
             }
+          } catch (adapterErr) {
+            console.warn('Could not query high-performance GPU adapter:', adapterErr);
           }
         }
 
@@ -119,6 +70,41 @@ async function getOrInitTts(tier = 'wasm', progressCallback) {
             if (typeof progressCallback === 'function') progressCallback(info);
           }
         });
+
+        // Obtain active WebGPU device (allocated with forwarded limits)
+        const activeDevice = env?.backends?.onnx?.webgpu?.device;
+        if (activeDevice) {
+          if (!globalThis.ort) globalThis.ort = {};
+          if (!globalThis.ort.env) globalThis.ort.env = {};
+          if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
+          globalThis.ort.env.webgpu.device = activeDevice;
+          if (adapter) globalThis.ort.env.webgpu.adapter = adapter;
+
+          // Runtime driver crash recovery (device.lost listener)
+          activeDevice.lost.then(async (info) => {
+            console.warn('WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
+            if (info.reason !== 'destroyed') {
+              currentTtsInstance = null;
+              initPromise = null;
+              currentTier = 'wasm';
+
+              try {
+                console.log('Recovering from GPU crash: switching Kokoro to Lightweight WASM mode...');
+                await getOrInitTts('wasm');
+              } catch (recErr) {
+                console.error('WASM recovery failed:', recErr);
+              }
+
+              self.postMessage({
+                type: 'device_lost',
+                reason: info.reason,
+                message: info.message || 'GPU driver reset / TDR crash',
+                fallbackTier: 'wasm'
+              });
+            }
+          });
+        }
+
         console.log('Kokoro Turbo Mode (WebGPU / fp32) initialized successfully.');
         currentTier = 'webgpu';
       } catch (gpuErr) {
