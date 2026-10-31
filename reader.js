@@ -1283,10 +1283,15 @@ function preparePrintStylesheet() {
   styleEl.textContent = `
     @page {
       size: ${paper.cssPageSize};
-      margin: 0.5in;
+      margin: 0;
     }
 
     @media print {
+      @page {
+        size: ${paper.cssPageSize};
+        margin: 0;
+      }
+
       :root {
         --reader-bg: ${printBg} !important;
         --reader-surface: ${printSurface} !important;
@@ -1345,11 +1350,27 @@ function preparePrintStylesheet() {
       /* 1. Apply Irlen Contrast & Theme on Print across canvas, containers & text */
       html,
       body,
-      body.va-reader-body,
+      body.va-reader-body {
+        background: ${printSurface} !important;
+        background-color: ${printSurface} !important;
+        color: ${printText} !important;
+        -webkit-text-fill-color: ${printText} !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        font-family: ${activeFont}, system-ui, sans-serif !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+
       #viewer-container,
       .page-container,
       .reader-layout,
       .reader-container {
+        display: block !important;
         background: ${printSurface} !important;
         background-color: ${printSurface} !important;
         color: ${printText} !important;
@@ -1359,12 +1380,8 @@ function preparePrintStylesheet() {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
-        height: auto !important;
-        min-height: auto !important;
-        max-height: none !important;
-        overflow: visible !important;
-        position: static !important;
-        font-family: ${activeFont}, system-ui, sans-serif !important;
+        border: none !important;
+        box-shadow: none !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -1423,7 +1440,7 @@ function preparePrintStylesheet() {
         position: static !important;
         box-sizing: border-box !important;
         margin: 0 !important;
-        padding: 0 0 20px 0 !important;
+        padding: 0.5in 0.6in !important;
         border: none !important;
         box-shadow: none !important;
         break-inside: auto !important;
@@ -1438,7 +1455,7 @@ function preparePrintStylesheet() {
         break-after: auto !important;
         page-break-after: auto !important;
         margin-bottom: 0 !important;
-        padding-bottom: 0 !important;
+        padding-bottom: 0.5in !important;
       }
 
       .page-header-tag {
@@ -1537,15 +1554,17 @@ function renderAllPagesForPrint() {
   isPrintingMultiPage = true;
   docContainer.innerHTML = '';
 
-  const titleEl = document.createElement('h1');
-  titleEl.textContent = currentDocumentTitle;
-  docContainer.appendChild(titleEl);
-
   const totalPages = currentTotalPages || currentLoadedPages.length;
-  currentLoadedPages.forEach((page) => {
+  currentLoadedPages.forEach((page, idx) => {
     if (!page) return;
     const pageEl = document.createElement('section');
     pageEl.className = 'reader-page';
+
+    if (idx === 0 && currentDocumentTitle) {
+      const titleEl = document.createElement('h1');
+      titleEl.textContent = currentDocumentTitle;
+      pageEl.appendChild(titleEl);
+    }
 
     const pageTag = document.createElement('span');
     pageTag.className = 'page-header-tag';
@@ -2145,15 +2164,17 @@ function displayExtractedPages(docTitle) {
     if (pageNav) pageNav.style.display = 'none';
   }
 
-  const titleEl = document.createElement('h1');
-  titleEl.textContent = currentDocumentTitle;
-  docContainer.appendChild(titleEl);
-
   // Render current active page
   const page = currentLoadedPages[currentReaderPageIndex - 1];
   if (page) {
     const pageEl = document.createElement('section');
     pageEl.className = 'reader-page';
+
+    if (currentDocumentTitle) {
+      const titleEl = document.createElement('h1');
+      titleEl.textContent = currentDocumentTitle;
+      pageEl.appendChild(titleEl);
+    }
 
     const pageTag = document.createElement('span');
     pageTag.className = 'page-header-tag';

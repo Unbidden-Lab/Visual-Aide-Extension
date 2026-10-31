@@ -1334,11 +1334,27 @@ body.contrast-inverted .page-header-tag {
   /* 1. Irlen Contrast & Theme on Print across canvas, containers & text */
   html,
   body,
-  body.va-reader-body,
+  body.va-reader-body {
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    font-family: var(--font-family, system-ui, sans-serif) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   #viewer-container,
   .page-container,
   .reader-layout,
   .reader-container {
+    display: block !important;
     background: var(--reader-surface, #ffffff) !important;
     background-color: var(--reader-surface, #ffffff) !important;
     color: var(--reader-text, #000000) !important;
@@ -1348,12 +1364,8 @@ body.contrast-inverted .page-header-tag {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    height: auto !important;
-    min-height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    position: static !important;
-    font-family: var(--font-family, system-ui, sans-serif) !important;
+    border: none !important;
+    box-shadow: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -1412,7 +1424,7 @@ body.contrast-inverted .page-header-tag {
     position: static !important;
     box-sizing: border-box !important;
     margin: 0 !important;
-    padding: 0 0 20px 0 !important;
+    padding: 0.5in 0.6in !important;
     border: none !important;
     box-shadow: none !important;
     break-inside: auto !important;
@@ -1427,7 +1439,7 @@ body.contrast-inverted .page-header-tag {
     break-after: auto !important;
     page-break-after: auto !important;
     margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
+    padding-bottom: 0.5in !important;
   }
 
   .page-header-tag {
