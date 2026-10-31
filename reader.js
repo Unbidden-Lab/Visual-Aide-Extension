@@ -31,10 +31,15 @@ Dyslexia is a neurobiological learning difference that primarily affects the ski
 When reading conventional print, individuals with dyslexia or Meares-Irlen syndrome often experience visual distortions. Words may appear to vibrate, blur, bunch together, or swim across the page. This pattern glare creates cognitive fatigue and diminishes reading comprehension.
 
 ### Key Accommodations
+
 1. Specialized Typefaces: Heavy-bottomed letterforms, such as OpenDyslexic, provide visual gravity that helps anchor letters in place and prevent rotations like b, d, p, and q.
+
 2. Custom Letter & Word Tracking: Widening the distance between letters and words eliminates visual crowding and maintains clear word boundaries.
+
 3. Expanded Leading (Line Height): Increasing vertical distance between lines prevents ascenders and descenders from overlapping.
+
 4. Glare Tint & Irlen Overlays: Neutralizing stark black-on-white contrast with soothing cream, peach, or mint tones reduces visual stress and headaches.
+
 5. Saccadic Bionic Anchoring: Bolding the leading characters of words guides eye fixations smoothly across sentences.
 
 Double-click on any word (such as *aberration*, *alleviate*, *ambiguous*, *comprehensive*, *pervasive*, *meticulous*, *ubiquitous*) to test the instant Simplified Dictionary!
@@ -1358,7 +1363,7 @@ function preparePrintStylesheet() {
         margin: 0 !important;
         padding: 0 !important;
         width: 100% !important;
-        height: 100% !important;
+        height: auto !important;
         min-height: 100% !important;
         font-family: ${activeFont}, system-ui, sans-serif !important;
         -webkit-print-color-adjust: exact !important;
@@ -1380,6 +1385,10 @@ function preparePrintStylesheet() {
         width: 100% !important;
         max-width: 100% !important;
         min-width: 0 !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
         border: none !important;
         box-shadow: none !important;
         -webkit-print-color-adjust: exact !important;
@@ -1405,6 +1414,10 @@ function preparePrintStylesheet() {
         max-height: none !important;
         overflow: visible !important;
         position: static !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
         font-family: ${activeFont}, system-ui, sans-serif !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -1422,9 +1435,7 @@ function preparePrintStylesheet() {
       }
 
       /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
-      .reader-page,
-      section,
-      article {
+      .reader-page {
         display: block !important;
         background: ${printSurface} !important;
         background-color: ${printSurface} !important;
@@ -1445,8 +1456,8 @@ function preparePrintStylesheet() {
         box-shadow: none !important;
         break-inside: auto !important;
         page-break-inside: auto !important;
-        break-after: page !important;
-        page-break-after: always !important;
+        break-after: auto !important;
+        page-break-after: auto !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
@@ -1478,10 +1489,7 @@ function preparePrintStylesheet() {
       }
 
       p,
-      .reader-document p,
-      li,
-      ul,
-      ol {
+      .reader-document p {
         color: ${printText} !important;
         -webkit-text-fill-color: ${printText} !important;
         background: transparent !important;
@@ -1493,10 +1501,42 @@ function preparePrintStylesheet() {
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-        orphans: 3 !important;
-        widows: 3 !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        orphans: 2 !important;
+        widows: 2 !important;
+      }
+
+      ul,
+      ol {
+        color: ${printText} !important;
+        -webkit-text-fill-color: ${printText} !important;
+        background: transparent !important;
+        margin-top: 0 !important;
+        margin-bottom: 14px !important;
+        padding-left: 24px !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+      }
+
+      li {
+        color: ${printText} !important;
+        -webkit-text-fill-color: ${printText} !important;
+        background: transparent !important;
+        line-height: ${activeLeading} !important;
+        letter-spacing: ${activeTracking} !important;
+        word-spacing: ${activeSpacing} !important;
+        margin-bottom: 6px !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        orphans: 2 !important;
+        widows: 2 !important;
       }
 
       h1,
@@ -1546,6 +1586,32 @@ async function ensureAllPagesLoaded() {
   }
 }
 
+function createReaderParagraphElement(paraText) {
+  const trimmed = (paraText || '').trim();
+  if (/^###\s+/.test(trimmed)) {
+    const h3 = document.createElement('h3');
+    h3.textContent = trimmed.replace(/^###\s+/, '');
+    return h3;
+  }
+  if (/^##\s+/.test(trimmed)) {
+    const h2 = document.createElement('h2');
+    h2.textContent = trimmed.replace(/^##\s+/, '');
+    return h2;
+  }
+  if (/^#\s+/.test(trimmed)) {
+    const h1 = document.createElement('h1');
+    h1.textContent = trimmed.replace(/^#\s+/, '');
+    return h1;
+  }
+  const p = document.createElement('p');
+  if (currentReaderSettings.bionic) {
+    p.innerHTML = applyBionicToParagraph(trimmed);
+  } else {
+    p.textContent = trimmed;
+  }
+  return p;
+}
+
 function renderAllPagesForPrint() {
   if (!currentLoadedPages || currentLoadedPages.length <= 1) return;
   const docContainer = document.getElementById('reader-document');
@@ -1575,13 +1641,8 @@ function renderAllPagesForPrint() {
     pageEl.appendChild(pageTag);
 
     page.paragraphs.forEach((paraText) => {
-      const p = document.createElement('p');
-      if (currentReaderSettings.bionic) {
-        p.innerHTML = applyBionicToParagraph(paraText);
-      } else {
-        p.textContent = paraText;
-      }
-      pageEl.appendChild(p);
+      const el = createReaderParagraphElement(paraText);
+      pageEl.appendChild(el);
     });
 
     docContainer.appendChild(pageEl);
@@ -2185,13 +2246,8 @@ function displayExtractedPages(docTitle) {
     pageEl.appendChild(pageTag);
 
     page.paragraphs.forEach(paraText => {
-      const p = document.createElement('p');
-      if (currentReaderSettings.bionic) {
-        p.innerHTML = applyBionicToParagraph(paraText);
-      } else {
-        p.textContent = paraText;
-      }
-      pageEl.appendChild(p);
+      const el = createReaderParagraphElement(paraText);
+      pageEl.appendChild(el);
     });
 
     docContainer.appendChild(pageEl);
@@ -2545,7 +2601,7 @@ function handleTtsPlay() {
     if (!textToRead) {
       const pageEl = document.querySelector('.reader-document .reader-page');
       if (pageEl) {
-        const paragraphs = Array.from(pageEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(Boolean);
+        const paragraphs = Array.from(pageEl.querySelectorAll('p, h1, h2, h3, h4, h5, h6')).map(p => p.innerText.trim()).filter(Boolean);
         textToRead = paragraphs.join('\n\n') || pageEl.innerText;
       }
     }
@@ -2596,7 +2652,7 @@ function handleTtsPlay() {
   if (!textToRead) {
     const pageEl = document.querySelector('.reader-document .reader-page');
     if (pageEl) {
-      const paragraphs = Array.from(pageEl.querySelectorAll('p')).map(p => p.innerText.trim()).filter(Boolean);
+      const paragraphs = Array.from(pageEl.querySelectorAll('p, h1, h2, h3, h4, h5, h6')).map(p => p.innerText.trim()).filter(Boolean);
       textToRead = paragraphs.join('\n\n') || pageEl.innerText;
     }
   }
