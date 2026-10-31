@@ -57,7 +57,8 @@ const DEFAULT_READER_SETTINGS = {
   ttsEngineTier: 'wasm',
   paperSize: 'letter',
   customPaperWidth: 8.5,
-  customPaperHeight: 11
+  customPaperHeight: 11,
+  sidebarCollapsed: false
 };
 
 let currentReaderSettings = { ...DEFAULT_READER_SETTINGS };
@@ -310,6 +311,7 @@ function initSettingsSync() {
     if (s.paperSize) currentReaderSettings.paperSize = s.paperSize;
     if (s.customPaperWidth !== undefined) currentReaderSettings.customPaperWidth = parseFloat(s.customPaperWidth) || 8.5;
     if (s.customPaperHeight !== undefined) currentReaderSettings.customPaperHeight = parseFloat(s.customPaperHeight) || 11;
+    if (s.sidebarCollapsed !== undefined) currentReaderSettings.sidebarCollapsed = Boolean(s.sidebarCollapsed);
 
     previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
     previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
@@ -460,6 +462,35 @@ function initToolbarControls() {
     saveReaderSettings();
   });
 
+  // Collapsible Accommodation Sidebar
+  const sidebarEl = document.getElementById('reader-sidebar');
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+
+  function setSidebarCollapsed(collapsed) {
+    currentReaderSettings.sidebarCollapsed = Boolean(collapsed);
+    if (sidebarEl) {
+      sidebarEl.classList.toggle('collapsed', currentReaderSettings.sidebarCollapsed);
+    }
+    if (sidebarToggleBtn) {
+      sidebarToggleBtn.classList.toggle('collapsed', currentReaderSettings.sidebarCollapsed);
+      sidebarToggleBtn.setAttribute('aria-expanded', String(!currentReaderSettings.sidebarCollapsed));
+    }
+    saveReaderSettings();
+  }
+
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', () => {
+      setSidebarCollapsed(!currentReaderSettings.sidebarCollapsed);
+    });
+  }
+
+  if (sidebarCollapseBtn) {
+    sidebarCollapseBtn.addEventListener('click', () => {
+      setSidebarCollapsed(true);
+    });
+  }
+
   // Paper Size & Print Dimensions Setup
   const paperSizeSelect = document.getElementById('reader-paper-size');
   const customPaperGroupEl = document.getElementById('reader-custom-paper-group');
@@ -475,7 +506,9 @@ function initToolbarControls() {
         customPaperGroupEl.style.display = isCustom ? 'flex' : 'none';
         customPaperGroupEl.classList.toggle('hidden', !isCustom);
       }
+      applyAllReaderStyles();
       preparePrintStylesheet();
+      updateReaderPaperBadges();
       saveReaderSettings();
     });
   }
@@ -485,9 +518,13 @@ function initToolbarControls() {
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val > 0) {
         currentReaderSettings.customPaperWidth = val;
+        applyAllReaderStyles();
         preparePrintStylesheet();
-        saveReaderSettings();
+        updateReaderPaperBadges();
       }
+    });
+    customWidthInput.addEventListener('change', () => {
+      saveReaderSettings();
     });
   }
 
@@ -496,9 +533,13 @@ function initToolbarControls() {
       const val = parseFloat(e.target.value);
       if (!isNaN(val) && val > 0) {
         currentReaderSettings.customPaperHeight = val;
+        applyAllReaderStyles();
         preparePrintStylesheet();
-        saveReaderSettings();
+        updateReaderPaperBadges();
       }
+    });
+    customHeightInput.addEventListener('change', () => {
+      saveReaderSettings();
     });
   }
 
@@ -847,23 +888,88 @@ async function checkReaderGpuAdmission() {
 }
 
 // -------------------------------------------------------------
-// Dynamic Paper Dimensions & Print Formatting Helpers
+// Dynamic Paper Dimensions & Universal Print Formatting
 // -------------------------------------------------------------
 const PAPER_PRESETS = {
-  letter: { name: 'Standard Letter', size: '8.5in 11in', widthIn: 8.5, heightIn: 11 },
-  a4: { name: 'A4', size: '210mm 297mm', widthIn: 8.27, heightIn: 11.69 },
-  folio: { name: 'Philippine Long / Folio', size: '8.5in 13in', widthIn: 8.5, heightIn: 13 },
-  legal: { name: 'US Legal', size: '8.5in 14in', widthIn: 8.5, heightIn: 14 }
+  letter: {
+    name: 'Standard Letter',
+    cssPageSize: 'letter portrait',
+    sizePrint: '8.5in 11in',
+    widthIn: 8.5,
+    heightIn: 11,
+    widthPx: 820,
+    aspect: '8.5 / 11',
+    label: 'Standard Letter (8.5" x 11")'
+  },
+  a4: {
+    name: 'A4',
+    cssPageSize: 'a4 portrait',
+    sizePrint: '210mm 297mm',
+    widthIn: 8.27,
+    heightIn: 11.69,
+    widthPx: 794,
+    aspect: '210 / 297',
+    label: 'A4 (210mm x 297mm)'
+  },
+  folio: {
+    name: 'Philippine Long / Folio',
+    cssPageSize: '8.5in 13in portrait',
+    sizePrint: '8.5in 13in',
+    widthIn: 8.5,
+    heightIn: 13,
+    widthPx: 820,
+    aspect: '8.5 / 13',
+    label: 'Philippine Long / Folio (8.5" x 13")'
+  },
+  legal: {
+    name: 'US Legal',
+    cssPageSize: 'legal portrait',
+    sizePrint: '8.5in 14in',
+    widthIn: 8.5,
+    heightIn: 14,
+    widthPx: 820,
+    aspect: '8.5 / 14',
+    label: 'US Legal (8.5" x 14")'
+  }
 };
 
-function getPrintPageSize() {
+function getActivePaperFormat() {
   const presetKey = currentReaderSettings.paperSize || 'letter';
   if (presetKey === 'custom') {
     const w = parseFloat(currentReaderSettings.customPaperWidth) || 8.5;
     const h = parseFloat(currentReaderSettings.customPaperHeight) || 11;
-    return `${w}in ${h}in`;
+    const baseW = Math.min(1080, Math.max(500, Math.round(w * 96)));
+    const minH = Math.round(baseW * (h / w));
+    return {
+      name: 'Custom',
+      cssPageSize: `${w}in ${h}in portrait`,
+      sizePrint: `${w}in ${h}in`,
+      widthIn: w,
+      heightIn: h,
+      widthPx: baseW,
+      minHeightPx: minH,
+      aspect: `${w} / ${h}`,
+      label: `Custom (${w}" x ${h}")`
+    };
   }
-  return PAPER_PRESETS[presetKey]?.size || '8.5in 11in';
+  const preset = PAPER_PRESETS[presetKey] || PAPER_PRESETS.letter;
+  const minH = Math.round(preset.widthPx * (preset.heightIn / preset.widthIn));
+  return {
+    ...preset,
+    minHeightPx: minH
+  };
+}
+
+function updateReaderPaperBadges() {
+  const paper = getActivePaperFormat();
+  const pageTags = document.querySelectorAll('.page-header-tag');
+  const totalPages = currentTotalPages || (currentLoadedPages && currentLoadedPages.length) || 1;
+  pageTags.forEach((tag, idx) => {
+    const pageNum = idx + 1;
+    tag.textContent = totalPages > 1
+      ? `Page ${pageNum} of ${totalPages} - [${paper.label}]`
+      : `Page ${pageNum} - [${paper.label}]`;
+  });
 }
 
 function preparePrintStylesheet() {
@@ -875,18 +981,24 @@ function preparePrintStylesheet() {
     document.head.appendChild(styleEl);
   }
 
-  const pageSize = getPrintPageSize();
+  const paper = getActivePaperFormat();
 
   styleEl.textContent = `
     @page {
-      size: ${pageSize};
+      size: ${paper.cssPageSize};
       margin: 0.5in;
     }
 
-    /* Hide all UI chrome, toolbars, settings drawers, and audio playback widgets */
+    /* Hide all UI chrome, toolbars, sidebars, settings drawers, and audio playback widgets */
     header,
     .reader-header,
     .header-top,
+    .reader-sidebar,
+    #reader-sidebar,
+    .sidebar-toggle-btn,
+    #sidebar-toggle-btn,
+    .sidebar-collapse-btn,
+    #sidebar-collapse-btn,
     .toolbar-scroll,
     .accommodation-bar,
     .tool-group,
@@ -931,6 +1043,14 @@ function preparePrintStylesheet() {
       overflow: visible !important;
     }
 
+    .reader-layout {
+      display: block !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+    }
+
     .reader-container {
       margin: 0 !important;
       padding: 0 !important;
@@ -954,6 +1074,7 @@ function preparePrintStylesheet() {
       margin: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
+      min-height: auto !important;
       overflow: visible !important;
     }
 
@@ -973,9 +1094,13 @@ function preparePrintStylesheet() {
       -webkit-text-fill-color: #000000 !important;
       width: 100% !important;
       max-width: 100% !important;
+      min-height: calc(${paper.heightIn}in - 1in) !important;
+      box-sizing: border-box !important;
       overflow: visible !important;
       page-break-after: always;
       break-after: page;
+      page-break-inside: avoid;
+      break-inside: avoid;
       margin: 0 0 24px 0 !important;
       padding: 0 !important;
     }
@@ -1003,6 +1128,7 @@ function preparePrintStylesheet() {
       letter-spacing: var(--tracking, 0px) !important;
       word-spacing: var(--spacing, 0px) !important;
       font-size: calc(var(--font-size, 18px) * 0.85) !important;
+      margin-bottom: 14px !important;
       orphans: 3;
       widows: 3;
     }
@@ -1058,7 +1184,10 @@ function renderAllPagesForPrint() {
 
     const pageTag = document.createElement('span');
     pageTag.className = 'page-header-tag';
-    pageTag.textContent = totalPages > 1 ? `Page ${page.pageNumber} of ${totalPages}` : `Page ${page.pageNumber}`;
+    const paper = getActivePaperFormat();
+    pageTag.textContent = totalPages > 1
+      ? `Page ${page.pageNumber} of ${totalPages} - [${paper.label}]`
+      : `Page ${page.pageNumber} - [${paper.label}]`;
     pageEl.appendChild(pageTag);
 
     page.paragraphs.forEach((paraText) => {
@@ -1162,6 +1291,19 @@ function updateToolbarUI() {
   if (customHeightEl) {
     customHeightEl.value = currentReaderSettings.customPaperHeight || 11;
   }
+
+  // Restore Accommodation Sidebar Collapsed State
+  const sidebarEl = document.getElementById('reader-sidebar');
+  const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+  const isCollapsed = Boolean(currentReaderSettings.sidebarCollapsed);
+  if (sidebarEl) {
+    sidebarEl.classList.toggle('collapsed', isCollapsed);
+  }
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.classList.toggle('collapsed', isCollapsed);
+    sidebarToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+  }
+
   preparePrintStylesheet();
 }
 
@@ -1173,13 +1315,26 @@ function applyAllReaderStyles() {
   root.style.setProperty('--spacing', `${currentReaderSettings.spacing}px`);
   root.style.setProperty('--leading', currentReaderSettings.leading);
 
+  // Apply dynamic paper dimensions and canvas aspect ratio
+  const paper = getActivePaperFormat();
+  root.style.setProperty('--paper-max-width', `${paper.widthPx}px`);
+  root.style.setProperty('--paper-min-height', `${paper.minHeightPx}px`);
+  root.style.setProperty('--paper-aspect-ratio', paper.aspect);
+
+  const docContainer = document.getElementById('reader-document');
+  if (docContainer) {
+    docContainer.style.setProperty('--paper-max-width', `${paper.widthPx}px`);
+    docContainer.style.setProperty('--paper-min-height', `${paper.minHeightPx}px`);
+    docContainer.style.setProperty('--paper-aspect-ratio', paper.aspect);
+    docContainer.dataset.paperPreset = currentReaderSettings.paperSize || 'letter';
+  }
+
   const body = document.body;
   body.className = 'va-reader-body';
   if (currentReaderSettings.contrast && currentReaderSettings.contrast !== 'default') {
     body.classList.add(`contrast-${currentReaderSettings.contrast}`);
   }
 
-  const docContainer = document.getElementById('reader-document');
   const hasCustomFontColor = Boolean(
     currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default'
   );
@@ -1609,7 +1764,10 @@ function displayExtractedPages(docTitle) {
 
     const pageTag = document.createElement('span');
     pageTag.className = 'page-header-tag';
-    pageTag.textContent = totalPages > 1 ? `Page ${page.pageNumber} of ${totalPages}` : `Page ${page.pageNumber}`;
+    const paper = getActivePaperFormat();
+    pageTag.textContent = totalPages > 1
+      ? `Page ${page.pageNumber} of ${totalPages} - [${paper.label}]`
+      : `Page ${page.pageNumber} - [${paper.label}]`;
     pageEl.appendChild(pageTag);
 
     page.paragraphs.forEach(paraText => {

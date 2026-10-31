@@ -8,28 +8,65 @@
 </head>
 <body class="va-reader-body">
 
-  <!-- Main Reader Header & Accommodation Bar -->
+  <!-- Main Reader Top Header -->
   <header class="reader-header">
     <div class="header-top">
-      <div class="brand">
-        <h1>VISUAL AIDE <span class="badge-tag">PDF READER</span></h1>
+      <div class="header-left">
+        <button id="sidebar-toggle-btn" class="action-btn sidebar-toggle-btn" aria-expanded="true" aria-controls="reader-sidebar" title="Toggle accommodation controls sidebar" data-tooltip-title="Accommodations" data-tooltip-desc="Show or collapse reading tools and accommodation controls">
+          <span class="toggle-bars" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+          <span class="sidebar-toggle-label">Accommodations</span>
+        </button>
+        <div class="brand">
+          <h1>VISUAL AIDE <span class="badge-tag">PDF READER</span></h1>
+        </div>
       </div>
+
+      <!-- Multi-Page Navigation Bar in Header -->
+      <div class="header-page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
+        <button id="reader-page-prev" class="tool-btn icon-btn" aria-label="Go to previous page" disabled>&lsaquo;</button>
+        <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
+        <button id="reader-page-next" class="tool-btn icon-btn" aria-label="Go to next page">&rsaquo;</button>
+      </div>
+
       <div class="header-controls">
+        <!-- Quick Read Aloud Controls in Header -->
+        <div class="header-tts-group" data-tooltip-title="Read Aloud" data-tooltip-desc="Listen to the current page or selection read aloud">
+          <button id="reader-tts-play" class="action-btn tts-btn" aria-label="Play text-to-speech">Play</button>
+          <button id="reader-tts-stop" class="action-btn tts-btn" aria-label="Stop text-to-speech">Stop</button>
+        </div>
         <span id="network-status" class="status-badge online" data-tooltip-title="Connection Status" data-tooltip-desc="Visual Aide operates fully offline without transmitting your data">
           <span class="dot"></span> <span id="network-text">Online Mode</span>
         </span>
         <button id="upload-nav-btn" class="action-btn" data-tooltip-title="Open PDF" data-tooltip-desc="Load a new PDF document into the accessible reader">Open PDF</button>
-        <button id="print-btn" class="action-btn" data-tooltip-title="Print Document" data-tooltip-desc="Print or export to PDF with current typography and contrast settings">Print</button>
+        <button id="print-btn" class="action-btn" data-tooltip-title="Print Document" data-tooltip-desc="Print or export to PDF with current paper format, typography, and contrast settings">Print</button>
       </div>
     </div>
+  </header>
 
-    <!-- Typography & Sensory Accommodation Bar -->
-    <div class="toolbar-scroll">
-      <div class="accommodation-bar">
-        <!-- Group 1: Typography & Visual Appearance (Typeface -> Size -> Font Color -> Irlen Contrast) -->
-        <div class="tool-group">
+  <!-- Workspace: Left Collapsible Sidebar + Reading Container -->
+  <div class="reader-layout" id="reader-layout">
+
+    <!-- Collapsible Accommodation Sidebar on Left -->
+    <aside class="reader-sidebar" id="reader-sidebar" aria-label="Reading Accommodations &amp; Controls">
+      <div class="sidebar-header">
+        <div class="sidebar-title-group">
+          <h2 class="sidebar-title">Accommodations</h2>
+          <span class="sidebar-subtitle">Adjust for your visual comfort</span>
+        </div>
+        <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" aria-label="Collapse accommodations sidebar" title="Collapse sidebar">&lsaquo;</button>
+      </div>
+
+      <div class="sidebar-scrollable">
+        <!-- Section 1: Typography & Visual Appearance -->
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Typography &amp; Colors</h3>
+
           <!-- Typeface -->
-          <div class="tool-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
+          <div class="sidebar-item" data-tooltip-title="Typeface" data-tooltip-desc="Switch to dyslexia-specialized or high-legibility fonts">
             <label for="reader-font">Typeface</label>
             <select id="reader-font" class="tool-select">
               <option value="Lexend">Lexend</option>
@@ -43,8 +80,8 @@
           </div>
 
           <!-- Font Size Zoom -->
-          <div class="tool-item" data-tooltip-title="Font Size" data-tooltip-desc="Scale text size up or down for comfortable reading">
-            <label>Size</label>
+          <div class="sidebar-item" data-tooltip-title="Font Size" data-tooltip-desc="Scale text size up or down for comfortable reading">
+            <label>Font Size</label>
             <div class="btn-group">
               <button id="font-decrease-btn" class="tool-btn" aria-label="Decrease font size">A-</button>
               <span id="font-size-val" class="tool-badge">18px</span>
@@ -53,7 +90,7 @@
           </div>
 
           <!-- Font Color -->
-          <div class="tool-item" data-tooltip-title="Font Color" data-tooltip-desc="Choose high-contrast or softened text colors to ease eye strain">
+          <div class="sidebar-item" data-tooltip-title="Font Color" data-tooltip-desc="Choose high-contrast or softened text colors to ease eye strain">
             <label for="reader-font-color">Font Color</label>
             <select id="reader-font-color" class="tool-select">
               <option value="default">Default</option>
@@ -66,8 +103,8 @@
           </div>
 
           <!-- Irlen Color Contrast Presets -->
-          <div class="tool-item" data-tooltip-title="Irlen Contrast" data-tooltip-desc="Apply soothing spectral background tints to eliminate glare and visual stress">
-            <label for="reader-contrast">Irlen Contrast</label>
+          <div class="sidebar-item" data-tooltip-title="Irlen Contrast" data-tooltip-desc="Apply soothing spectral background tints to eliminate glare and visual stress">
+            <label for="reader-contrast">Irlen Contrast Tint</label>
             <select id="reader-contrast" class="tool-select">
               <option value="default">Default White</option>
               <option value="cream">Soft Cream</option>
@@ -79,66 +116,61 @@
               <option value="custom">Custom Color Pair</option>
             </select>
           </div>
-        </div>
+        </section>
 
-        <!-- Group 2: Micro-Spacing (TRACKING -> WORD SPACE -> LEADING) -->
-        <div class="tool-group">
+        <!-- Section 2: Micro-Spacing Sliders -->
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Micro-Spacing</h3>
+
           <!-- Tracking (Letter Space) -->
-          <div class="tool-item" data-tooltip-title="Letter Tracking" data-tooltip-desc="Expand letter spacing to prevent character crowding and blurring">
+          <div class="sidebar-item" data-tooltip-title="Letter Tracking" data-tooltip-desc="Expand letter spacing to prevent character crowding and blurring">
             <div class="tool-label-row">
-              <label for="reader-tracking">Tracking</label>
+              <label for="reader-tracking">Letter Spacing</label>
               <span id="reader-tracking-val" class="tool-badge">0px</span>
             </div>
             <input type="range" id="reader-tracking" min="0" max="6" step="0.25" value="0">
           </div>
 
           <!-- Spacing (Word Space) -->
-          <div class="tool-item" data-tooltip-title="Word Spacing" data-tooltip-desc="Increase space between words to improve word boundary separation">
+          <div class="sidebar-item" data-tooltip-title="Word Spacing" data-tooltip-desc="Increase space between words to improve word boundary separation">
             <div class="tool-label-row">
-              <label for="reader-spacing">Word Space</label>
+              <label for="reader-spacing">Word Spacing</label>
               <span id="reader-spacing-val" class="tool-badge">0px</span>
             </div>
             <input type="range" id="reader-spacing" min="0" max="12" step="0.5" value="0">
           </div>
 
           <!-- Leading (Line Height) -->
-          <div class="tool-item" data-tooltip-title="Line Height (Leading)" data-tooltip-desc="Add vertical space between lines to prevent line skipping and fatigue">
+          <div class="sidebar-item" data-tooltip-title="Line Height (Leading)" data-tooltip-desc="Add vertical space between lines to prevent line skipping and fatigue">
             <div class="tool-label-row">
-              <label for="reader-leading">Leading</label>
+              <label for="reader-leading">Line Height</label>
               <span id="reader-leading-val" class="tool-badge">1.6x</span>
             </div>
             <input type="range" id="reader-leading" min="1.1" max="2.6" step="0.1" value="1.6">
           </div>
-        </div>
+        </section>
 
-        <!-- Group 3: Reading Guides (BIONIC READ -> FOCUS RULER) -->
-        <div class="tool-group">
-          <!-- Toggles: Bionic & Ruler -->
-          <div class="tool-item tool-toggles">
+        <!-- Section 3: Reading Guides -->
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Reading Guides</h3>
+          <div class="sidebar-toggles">
             <label class="checkbox-label" data-tooltip-title="Bionic Reading" data-tooltip-desc="Bolds initial word fixations to guide rapid saccadic eye movements">
               <input type="checkbox" id="reader-bionic-toggle">
-              <span>Bionic Read</span>
+              <span>Bionic Reading</span>
             </label>
             <label class="checkbox-label" data-tooltip-title="Focus Ruler" data-tooltip-desc="Interactive reading guide bar following the mouse cursor">
               <input type="checkbox" id="reader-ruler-toggle">
-              <span>Focus Ruler</span>
+              <span>Focus Reading Ruler</span>
             </label>
           </div>
-        </div>
+        </section>
 
-        <!-- Group 4: Audio & Reference Tools (READ ALOUD -> Page Nav -> Simplified Dict) -->
-        <div class="tool-group">
-          <!-- Text-to-Speech Player Controls -->
-          <div class="tool-item tts-player" data-tooltip-title="Read Aloud (TTS)" data-tooltip-desc="Listen to the current page or highlighted selection read aloud">
-            <label>Read Aloud</label>
-            <div class="btn-group">
-              <button id="reader-tts-play" class="tool-btn icon-btn" aria-label="Play text-to-speech">Play</button>
-              <button id="reader-tts-stop" class="tool-btn icon-btn" aria-label="Stop text-to-speech">Stop</button>
-            </div>
-          </div>
+        <!-- Section 4: Text-to-Speech (TTS) Voice & Speed -->
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Speech &amp; Audio</h3>
 
-          <!-- TTS Voice Selector -->
-          <div class="tool-item" data-tooltip-title="TTS Voice" data-tooltip-desc="Choose female (Aria) or male (Guy) natural neural voice for reading aloud">
+          <!-- Voice Selector -->
+          <div class="sidebar-item" data-tooltip-title="TTS Voice" data-tooltip-desc="Choose natural neural voice for reading aloud">
             <label for="reader-tts-voice">Voice</label>
             <select id="reader-tts-voice" class="tool-select">
               <optgroup label="Standard">
@@ -154,9 +186,9 @@
             </select>
           </div>
 
-          <!-- TTS Speed Multiplier -->
-          <div class="tool-item" data-tooltip-title="Speech Speed" data-tooltip-desc="Adjust reading rate multiplier (0.75x to 1.5x)">
-            <label for="reader-tts-speed">Speed</label>
+          <!-- Speed Multiplier -->
+          <div class="sidebar-item" data-tooltip-title="Speech Speed" data-tooltip-desc="Adjust reading rate multiplier (0.75x to 1.5x)">
+            <label for="reader-tts-speed">Reading Speed</label>
             <select id="reader-tts-speed" class="tool-select">
               <option value="0.75">0.75x</option>
               <option value="0.9">0.9x</option>
@@ -166,104 +198,100 @@
             </select>
           </div>
 
-          <!-- TTS Engine Tier -->
-          <div class="tool-item" id="reader-tts-engine-tier-group" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) or Turbo Mode (GPU / ~330 MB)">
-            <label for="reader-tts-engine-tier">Tier</label>
+          <!-- Engine Tier -->
+          <div class="sidebar-item" id="reader-tts-engine-tier-group" data-tooltip-title="Neural Engine Tier" data-tooltip-desc="Choose Lightweight Mode (CPU / ~85 MB) or Turbo Mode (GPU / ~330 MB)">
+            <label for="reader-tts-engine-tier">Neural Tier</label>
             <select id="reader-tts-engine-tier" class="tool-select">
               <option value="wasm">Lightweight (CPU / ~85 MB)</option>
               <option value="webgpu">Turbo (GPU / ~330 MB)</option>
             </select>
           </div>
+        </section>
 
-          <!-- Multi-Page Navigation Bar -->
-          <div class="tool-item page-nav" id="reader-page-nav" style="display: none;" data-tooltip-title="Page Navigation" data-tooltip-desc="Navigate between pages in multi-page PDF documents">
-            <label>Page</label>
-            <div class="btn-group">
-              <button id="reader-page-prev" class="tool-btn icon-btn" aria-label="Go to previous page" disabled>&lsaquo;</button>
-              <span id="reader-page-indicator" class="tool-badge">1 / 1</span>
-              <button id="reader-page-next" class="tool-btn icon-btn" aria-label="Go to next page">&rsaquo;</button>
-            </div>
-          </div>
+        <!-- Section 5: Paper Dimensions & Page Format -->
+        <section class="sidebar-section" id="reader-print-setup-group">
+          <h3 class="sidebar-section-title">Paper Size &amp; Format</h3>
 
-          <!-- Simplified Dictionary Search -->
-          <div class="tool-item dict-search-box" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up words in simple, plain-language definitions with pronunciation">
-            <label for="dict-search-input">Simplified Dict</label>
-            <div class="input-with-btn">
-              <input type="text" id="dict-search-input" placeholder="Look up word...">
-              <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Group 5: Paper Dimensions & Print Setup -->
-        <div class="tool-group" id="reader-print-setup-group">
           <!-- Paper Size Preset -->
-          <div class="tool-item" data-tooltip-title="Paper Size" data-tooltip-desc="Choose paper dimensions for printing and PDF export (Letter, A4, Folio, Legal, or Custom)">
-            <label for="reader-paper-size">Paper Size</label>
+          <div class="sidebar-item" data-tooltip-title="Paper Size" data-tooltip-desc="Choose paper dimensions for on-screen document canvas, printing, and PDF export">
+            <label for="reader-paper-size">Paper Size Preset</label>
             <select id="reader-paper-size" class="tool-select">
               <option value="letter">Standard Letter (8.5" x 11")</option>
               <option value="a4">A4 (210mm x 297mm)</option>
               <option value="folio">Philippine Long / Folio (8.5" x 13")</option>
               <option value="legal">US Legal (8.5" x 14")</option>
-              <option value="custom">Custom</option>
+              <option value="custom">Custom Dimensions</option>
             </select>
           </div>
 
           <!-- Custom Paper Dimensions (Width & Height in inches) -->
-          <div class="tool-item custom-paper-item hidden" id="reader-custom-paper-group" style="display: none;" data-tooltip-title="Custom Dimensions" data-tooltip-desc="Enter custom paper width and height in inches">
-            <label>Dimensions</label>
+          <div class="sidebar-item custom-paper-item hidden" id="reader-custom-paper-group" style="display: none;" data-tooltip-title="Custom Dimensions" data-tooltip-desc="Enter custom paper width and height in inches">
+            <label>Custom Dimensions (Inches)</label>
             <div class="custom-paper-fields">
               <div class="paper-dim-field">
-                <label for="reader-custom-paper-width">W</label>
+                <label for="reader-custom-paper-width">Width</label>
                 <input type="number" id="reader-custom-paper-width" class="paper-dim-input" value="8.5" min="2" max="40" step="0.1" aria-label="Custom paper width in inches">
               </div>
               <span class="paper-dim-times">&times;</span>
               <div class="paper-dim-field">
-                <label for="reader-custom-paper-height">H</label>
+                <label for="reader-custom-paper-height">Height</label>
                 <input type="number" id="reader-custom-paper-height" class="paper-dim-input" value="11" min="2" max="60" step="0.1" aria-label="Custom paper height in inches">
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <!-- Section 6: Simplified Dictionary -->
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Simplified Dictionary</h3>
+          <div class="sidebar-item dict-search-box" data-tooltip-title="Simplified Dictionary" data-tooltip-desc="Look up words in simple, plain-language definitions with pronunciation">
+            <label for="dict-search-input">Look Up Word</label>
+            <div class="input-with-btn">
+              <input type="text" id="dict-search-input" placeholder="Type a word...">
+              <button id="dict-search-btn" class="tool-btn" aria-label="Look up word in dictionary">Search</button>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
-  </header>
+    </aside>
 
-  <!-- Main Container -->
-  <main class="reader-container">
+    <!-- Main Reader Container -->
+    <main class="reader-container" id="reader-container">
 
-    <!-- Upload Hero Dropzone (visible when no file is loaded) -->
-    <section id="upload-hero" class="upload-hero">
-      <div class="drop-card" id="drop-zone">
-        <h2>Accessible PDF Reader</h2>
-        <p class="hero-desc">Open any downloaded or online PDF file. Read comfortably with dyslexia-friendly typefaces, custom word and line spacing, Irlen contrast tints, bionic reading, and full offline accessibility.</p>
+      <!-- Upload Hero Dropzone (visible when no file is loaded) -->
+      <section id="upload-hero" class="upload-hero">
+        <div class="drop-card" id="drop-zone">
+          <h2>Accessible PDF Reader</h2>
+          <p class="hero-desc">Open any downloaded or online PDF file. Read comfortably with dyslexia-friendly typefaces, custom word and line spacing, Irlen contrast tints, bionic reading, and full offline accessibility.</p>
 
-        <div class="drop-actions">
-          <label class="file-browse-btn">
-            Choose PDF Document
-            <input type="file" id="file-input" accept=".pdf,application/pdf">
-          </label>
-          <button id="load-sample-btn" class="sample-btn">Load Sample Dyslexia Guide</button>
+          <div class="drop-actions">
+            <label class="file-browse-btn">
+              Choose PDF Document
+              <input type="file" id="file-input" accept=".pdf,application/pdf">
+            </label>
+            <button id="load-sample-btn" class="sample-btn">Load Sample Dyslexia Guide</button>
+          </div>
+
+          <div class="online-offline-notice">
+            <span class="badge">Offline &amp; Online Ready</span>
+            <p>Works completely offline without Wi-Fi. All accessibility fonts, PDF text extractors, and simplified dictionary cache run directly inside your browser.</p>
+          </div>
         </div>
+      </section>
 
-        <div class="online-offline-notice">
-          <span class="badge">Offline &amp; Online Ready</span>
-          <p>Works completely offline without Wi-Fi. All accessibility fonts, PDF text extractors, and simplified dictionary cache run directly inside your browser.</p>
-        </div>
+      <!-- Loading State Overlay -->
+      <div id="reader-loading-overlay" class="reader-loading-overlay hidden" role="status" aria-live="polite">
+        <div class="reader-spinner"></div>
+        <p id="reader-loading-msg" class="reader-loading-msg">Loading and analyzing PDF document...</p>
       </div>
-    </section>
 
-        <!-- Loading State Overlay -->
-    <div id="reader-loading-overlay" class="reader-loading-overlay hidden" role="status" aria-live="polite">
-      <div class="reader-spinner"></div>
-      <p id="reader-loading-msg" class="reader-loading-msg">Loading and analyzing PDF document...</p>
-    </div>
+      <!-- Active Reader Content Viewport -->
+      <article id="reader-document" class="reader-document hidden">
+        <!-- Generated pages and extracted text will be inserted here -->
+      </article>
+    </main>
 
-    <!-- Active Reader Content Viewport -->
-    <article id="reader-document" class="reader-document hidden">
-      <!-- Generated pages and extracted text will be inserted here -->
-    </article>
-  </main>
+  </div>
 
   <!-- Interactive Tooltip Overlay -->
   <div id="reader-tooltip" class="reader-tooltip" role="tooltip" aria-hidden="true"></div>
