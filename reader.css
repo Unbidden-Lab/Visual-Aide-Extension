@@ -1245,10 +1245,19 @@ body.contrast-inverted {
 
 /* Base Print Styles */
 @media print {
+  :root {
+    --reader-bg: #ffffff !important;
+    --reader-surface: #ffffff !important;
+    --reader-text: #000000 !important;
+    --reader-border: #cccccc !important;
+  }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
   }
 
   header,
@@ -1277,51 +1286,48 @@ body.contrast-inverted {
   #va-action-badge,
   #va-dict-modal,
   #reader-page-nav,
+  #dict-modal,
+  #reader-ruler,
+  #reader-tooltip,
+  #reader-kokoro-modal,
+  #upload-hero,
   #print-btn,
   #upload-nav-btn {
     display: none !important;
     visibility: hidden !important;
   }
 
-  .reader-layout {
-    display: block !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: var(--reader-surface, #ffffff) !important;
-  }
-
+  /* 1. Reset Theme on Print: clean background & deep black text across all containers & text */
   html,
   body,
-  body.va-reader-body {
-    background: var(--reader-surface, #ffffff) !important;
-    background-color: var(--reader-surface, #ffffff) !important;
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    font-family: var(--font-family, system-ui, sans-serif) !important;
-  }
-
+  body.va-reader-body,
+  #viewer-container,
+  .page-container,
+  .reader-layout,
   .reader-container {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
     overflow: visible !important;
-    background: var(--reader-surface, #ffffff) !important;
-    background-color: var(--reader-surface, #ffffff) !important;
+    position: static !important;
+    font-family: var(--font-family, system-ui, sans-serif) !important;
   }
 
   .reader-document {
     display: block !important;
-    background: var(--reader-surface, #ffffff) !important;
-    background-color: var(--reader-surface, #ffffff) !important;
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
@@ -1329,80 +1335,130 @@ body.contrast-inverted {
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
     overflow: visible !important;
+    position: static !important;
     font-family: var(--font-family, system-ui, sans-serif) !important;
   }
 
   .reader-document * {
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background: transparent !important;
+    background-color: transparent !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
 
-  .reader-page {
+  /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
+  .reader-page,
+  section,
+  article {
     display: block !important;
-    background: var(--reader-surface, #ffffff) !important;
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
     overflow: visible !important;
-    page-break-after: always;
-    break-after: page;
-    margin: 0 0 20px 0 !important;
-    padding: 0.2in 0 !important;
-    border-bottom: none !important;
+    position: static !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 0 20px 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    break-after: page !important;
+    page-break-after: always !important;
   }
 
   .reader-page:last-child {
-    page-break-after: auto;
-    break-after: auto;
+    break-after: auto !important;
+    page-break-after: auto !important;
     margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
   }
 
   .page-header-tag {
     display: block !important;
-    color: var(--reader-text, #555555) !important;
-    -webkit-text-fill-color: var(--reader-text, #555555) !important;
-    opacity: 0.75 !important;
+    color: #555555 !important;
+    -webkit-text-fill-color: #555555 !important;
+    background: transparent !important;
     font-size: 0.75rem !important;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.4) !important;
+    border-bottom: 1px solid #cccccc !important;
     margin-bottom: 16px !important;
     padding-bottom: 4px !important;
     font-family: system-ui, -apple-system, sans-serif !important;
     text-transform: uppercase;
     letter-spacing: 1.2px;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
   }
 
-  .reader-document p {
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+  p,
+  .reader-document p,
+  li,
+  ul,
+  ol {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background: transparent !important;
     line-height: var(--leading, 1.6) !important;
     letter-spacing: var(--tracking, 0px) !important;
     word-spacing: var(--spacing, 0px) !important;
-    font-size: var(--font-size, 18px) !important;
+    margin-top: 0 !important;
     margin-bottom: 14px !important;
-    orphans: 3;
-    widows: 3;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    orphans: 3 !important;
+    widows: 3 !important;
   }
 
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
   .reader-document h1,
   .reader-document h2,
   .reader-document h3,
   .reader-document h4,
   .reader-document h5,
   .reader-document h6 {
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
-    page-break-after: avoid;
-    break-after: avoid;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background: transparent !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    margin-top: 18px !important;
+    margin-bottom: 8px !important;
   }
 
   .va-bionic-fix {
     font-weight: 700 !important;
-    color: var(--reader-text, #111111) !important;
-    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    background: transparent !important;
   }
 }
 

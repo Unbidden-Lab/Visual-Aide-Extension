@@ -1196,44 +1196,10 @@ function preparePrintStylesheet() {
   }
 
   const paper = getActivePaperFormat();
-
-  // Compute exact surface background color and text color based on active settings
-  let surfaceColor = '#ffffff';
-  let textColor = '#111111';
-
-  if (currentReaderSettings.contrast === 'custom') {
-    surfaceColor = currentReaderSettings.customBgColor || '#fbf0d9';
-    textColor = currentReaderSettings.customFontColor || '#111111';
-  } else if (currentReaderSettings.contrast === 'cream') {
-    surfaceColor = '#fbf5e6';
-    textColor = '#222222';
-  } else if (currentReaderSettings.contrast === 'peach') {
-    surfaceColor = '#fff1e8';
-    textColor = '#26211f';
-  } else if (currentReaderSettings.contrast === 'mint') {
-    surfaceColor = '#ecf7ed';
-    textColor = '#1b261b';
-  } else if (currentReaderSettings.contrast === 'navy') {
-    surfaceColor = '#0f1f33';
-    textColor = '#ffd796';
-  } else if (currentReaderSettings.contrast === 'dark') {
-    surfaceColor = '#1e1e1e';
-    textColor = '#e8e8e8';
-  } else if (currentReaderSettings.contrast === 'inverted') {
-    surfaceColor = '#0a0a0a';
-    textColor = '#ffff00';
-  }
-
-  // If explicit font color is chosen (and not in inverted/dark where preset fg matters)
-  if (currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default' && currentReaderSettings.contrast !== 'custom') {
-    textColor = currentReaderSettings.fontColor;
-  }
-
   const activeFont = currentReaderSettings.font || 'Lexend';
-  const activeFontSize = currentReaderSettings.fontSize ? `${currentReaderSettings.fontSize}px` : '18px';
+  const activeLeading = currentReaderSettings.leading || 1.6;
   const activeTracking = currentReaderSettings.tracking ? `${currentReaderSettings.tracking}px` : '0px';
   const activeSpacing = currentReaderSettings.spacing ? `${currentReaderSettings.spacing}px` : '0px';
-  const activeLeading = currentReaderSettings.leading || 1.6;
 
   styleEl.textContent = `
     @page {
@@ -1241,10 +1207,19 @@ function preparePrintStylesheet() {
       margin: 0.5in;
     }
 
+    :root {
+      --reader-bg: #ffffff !important;
+      --reader-surface: #ffffff !important;
+      --reader-text: #000000 !important;
+      --reader-border: #cccccc !important;
+    }
+
     * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
     }
 
     /* Hide all UI chrome, toolbars, sidebars, settings drawers, and audio playback widgets */
@@ -1285,38 +1260,37 @@ function preparePrintStylesheet() {
       visibility: hidden !important;
     }
 
+    /* 1. Reset Theme on Print: clean background & deep black text across all containers & text */
     html,
     body,
-    body.va-reader-body {
-      background: ${surfaceColor} !important;
-      background-color: ${surfaceColor} !important;
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      height: auto !important;
-      overflow: visible !important;
-      font-family: ${activeFont}, system-ui, sans-serif !important;
-    }
-
+    body.va-reader-body,
+    #viewer-container,
+    .page-container,
     .reader-layout,
     .reader-container {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
       margin: 0 !important;
       padding: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: auto !important;
+      max-height: none !important;
       overflow: visible !important;
-      background: ${surfaceColor} !important;
-      background-color: ${surfaceColor} !important;
+      position: static !important;
+      font-family: ${activeFont}, system-ui, sans-serif !important;
     }
 
     .reader-document {
       display: block !important;
-      background: ${surfaceColor} !important;
-      background-color: ${surfaceColor} !important;
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
       box-shadow: none !important;
       border: none !important;
       border-radius: 0 !important;
@@ -1324,83 +1298,130 @@ function preparePrintStylesheet() {
       margin: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
       min-height: auto !important;
+      max-height: none !important;
       overflow: visible !important;
+      position: static !important;
       font-family: ${activeFont}, system-ui, sans-serif !important;
     }
 
     .reader-document * {
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      background: transparent !important;
+      background-color: transparent !important;
       box-shadow: none !important;
       text-shadow: none !important;
     }
 
-    .reader-page {
+    /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
+    .reader-page,
+    section,
+    article {
       display: block !important;
-      background: ${surfaceColor} !important;
-      background-color: ${surfaceColor} !important;
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
       width: 100% !important;
       max-width: 100% !important;
-      box-sizing: border-box !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: auto !important;
+      max-height: none !important;
       overflow: visible !important;
-      page-break-after: always;
-      break-after: page;
-      margin: 0 0 20px 0 !important;
-      padding: 0.2in 0 !important;
-      border-bottom: none !important;
+      position: static !important;
+      box-sizing: border-box !important;
+      margin: 0 !important;
+      padding: 0 0 20px 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      break-inside: auto !important;
+      page-break-inside: auto !important;
+      break-after: page !important;
+      page-break-after: always !important;
     }
 
     .reader-page:last-child {
-      page-break-after: auto;
-      break-after: auto;
+      break-after: auto !important;
+      page-break-after: auto !important;
       margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
     }
 
     .page-header-tag {
       display: block !important;
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
-      opacity: 0.75 !important;
+      color: #555555 !important;
+      -webkit-text-fill-color: #555555 !important;
+      background: transparent !important;
       font-size: 0.75rem !important;
-      border-bottom: 1px solid rgba(128, 128, 128, 0.4) !important;
+      border-bottom: 1px solid #cccccc !important;
       margin-bottom: 16px !important;
       padding-bottom: 4px !important;
       font-family: system-ui, -apple-system, sans-serif !important;
       text-transform: uppercase;
       letter-spacing: 1.2px;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      break-after: avoid !important;
+      page-break-after: avoid !important;
     }
 
-    .reader-document p {
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
+    p,
+    .reader-document p,
+    li,
+    ul,
+    ol {
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      background: transparent !important;
       line-height: ${activeLeading} !important;
       letter-spacing: ${activeTracking} !important;
       word-spacing: ${activeSpacing} !important;
-      font-size: ${activeFontSize} !important;
+      margin-top: 0 !important;
       margin-bottom: 14px !important;
-      orphans: 3;
-      widows: 3;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      orphans: 3 !important;
+      widows: 3 !important;
     }
 
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
     .reader-document h1,
     .reader-document h2,
     .reader-document h3,
     .reader-document h4,
     .reader-document h5,
     .reader-document h6 {
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
-      page-break-after: avoid;
-      break-after: avoid;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      background: transparent !important;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+      break-after: avoid !important;
+      page-break-after: avoid !important;
+      margin-top: 18px !important;
+      margin-bottom: 8px !important;
     }
 
     .va-bionic-fix {
       font-weight: 700 !important;
-      color: ${textColor} !important;
-      -webkit-text-fill-color: ${textColor} !important;
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+      background: transparent !important;
     }
   `;
 }
