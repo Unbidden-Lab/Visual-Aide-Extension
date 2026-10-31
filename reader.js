@@ -1315,17 +1315,21 @@ function applyAllReaderStyles() {
   root.style.setProperty('--spacing', `${currentReaderSettings.spacing}px`);
   root.style.setProperty('--leading', currentReaderSettings.leading);
 
-  // Apply dynamic paper dimensions and canvas aspect ratio
+  // Apply dynamic paper dimensions without clamping height
   const paper = getActivePaperFormat();
   root.style.setProperty('--paper-max-width', `${paper.widthPx}px`);
   root.style.setProperty('--paper-min-height', `${paper.minHeightPx}px`);
-  root.style.setProperty('--paper-aspect-ratio', paper.aspect);
+  root.style.removeProperty('--paper-aspect-ratio');
 
   const docContainer = document.getElementById('reader-document');
   if (docContainer) {
     docContainer.style.setProperty('--paper-max-width', `${paper.widthPx}px`);
     docContainer.style.setProperty('--paper-min-height', `${paper.minHeightPx}px`);
-    docContainer.style.setProperty('--paper-aspect-ratio', paper.aspect);
+    docContainer.style.maxWidth = `${paper.widthPx}px`;
+    docContainer.style.minHeight = `${paper.minHeightPx}px`;
+    docContainer.style.height = 'auto';
+    docContainer.style.removeProperty('--paper-aspect-ratio');
+    docContainer.style.removeProperty('aspect-ratio');
     docContainer.dataset.paperPreset = currentReaderSettings.paperSize || 'letter';
   }
 
@@ -1358,36 +1362,40 @@ function applyAllReaderStyles() {
         el.style.setProperty('-webkit-text-fill-color', customFg, 'important');
       });
     }
-  } else if (hasCustomFontColor) {
-    const chosenColor = currentReaderSettings.fontColor;
-    root.style.setProperty('--reader-text', chosenColor);
-    body.style.setProperty('--reader-text', chosenColor, 'important');
-    if (docContainer) {
-      docContainer.style.setProperty('--reader-text', chosenColor, 'important');
-      docContainer.style.setProperty('color', chosenColor, 'important');
-      docContainer.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
-      const textEls = docContainer.querySelectorAll(
-        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
-      );
-      textEls.forEach((el) => {
-        el.style.setProperty('color', chosenColor, 'important');
-        el.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
-      });
-    }
   } else {
-    root.style.removeProperty('--reader-text');
-    body.style.removeProperty('--reader-text');
-    if (docContainer) {
-      docContainer.style.removeProperty('--reader-text');
-      docContainer.style.removeProperty('color');
-      docContainer.style.removeProperty('-webkit-text-fill-color');
-      const textEls = docContainer.querySelectorAll(
-        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
-      );
-      textEls.forEach((el) => {
-        el.style.removeProperty('color');
-        el.style.removeProperty('-webkit-text-fill-color');
-      });
+    root.style.removeProperty('--reader-bg');
+    root.style.removeProperty('--reader-surface');
+    if (hasCustomFontColor) {
+      const chosenColor = currentReaderSettings.fontColor;
+      root.style.setProperty('--reader-text', chosenColor);
+      body.style.setProperty('--reader-text', chosenColor, 'important');
+      if (docContainer) {
+        docContainer.style.setProperty('--reader-text', chosenColor, 'important');
+        docContainer.style.setProperty('color', chosenColor, 'important');
+        docContainer.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
+        const textEls = docContainer.querySelectorAll(
+          'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+        );
+        textEls.forEach((el) => {
+          el.style.setProperty('color', chosenColor, 'important');
+          el.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
+        });
+      }
+    } else {
+      root.style.removeProperty('--reader-text');
+      body.style.removeProperty('--reader-text');
+      if (docContainer) {
+        docContainer.style.removeProperty('--reader-text');
+        docContainer.style.removeProperty('color');
+        docContainer.style.removeProperty('-webkit-text-fill-color');
+        const textEls = docContainer.querySelectorAll(
+          'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+        );
+        textEls.forEach((el) => {
+          el.style.removeProperty('color');
+          el.style.removeProperty('-webkit-text-fill-color');
+        });
+      }
     }
   }
 }
