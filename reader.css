@@ -305,9 +305,9 @@ body.va-reader-body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--reader-border, rgba(255, 255, 255, 0.1));
-  background: #1e1e1e;
+  padding: 14px 16px 8px 16px;
+  background: transparent;
+  border-bottom: none;
   flex-shrink: 0;
 }
 
@@ -355,7 +355,7 @@ body.va-reader-body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 12px 14px 40px 14px;
+  padding: 4px 14px 40px 14px;
   scrollbar-width: thin;
 }
 .sidebar-scrollable::-webkit-scrollbar {
@@ -461,6 +461,175 @@ body.va-reader-body {
 }
 .tool-select:focus {
   border-color: var(--accent);
+}
+
+/* Custom Color Contrast Chooser */
+.custom-contrast-card {
+  display: none;
+  margin-top: 8px;
+  background-color: #212121;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.custom-contrast-card.custom-active {
+  display: flex;
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.2);
+}
+
+.custom-contrast-card.hidden {
+  display: none !important;
+}
+
+.custom-contrast-pickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.color-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.color-picker-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #999999;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.color-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #161616;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  padding: 2px 6px;
+  transition: border-color 0.2s ease;
+}
+
+.color-input-wrapper:focus-within {
+  border-color: var(--accent);
+}
+
+.color-input-wrapper input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.color-input-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input-wrapper input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.color-hex-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #f0f0f0;
+  font-family: monospace;
+  font-size: 0.74rem;
+  outline: none;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* WCAG Live Status Row */
+.wcag-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 6px;
+}
+
+.wcag-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wcag-badge-label {
+  font-size: 0.7rem;
+  color: #888888;
+  font-weight: 500;
+}
+
+.wcag-ratio-val {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #f0f0f0;
+}
+
+.wcag-grade-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.wcag-grade-badge.grade-aaa {
+  background: rgba(46, 204, 113, 0.18);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.35);
+}
+
+.wcag-grade-badge.grade-aa {
+  background: rgba(52, 152, 219, 0.18);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.35);
+}
+
+.wcag-grade-badge.grade-aa-large {
+  background: rgba(243, 156, 18, 0.18);
+  color: #f39c12;
+  border: 1px solid rgba(243, 156, 18, 0.35);
+}
+
+.wcag-grade-badge.grade-fail {
+  background: rgba(231, 76, 60, 0.18);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+}
+
+/* Live Sample Preview Box */
+.contrast-sample-preview {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .btn-group {
@@ -1076,6 +1245,12 @@ body.contrast-inverted {
 
 /* Base Print Styles */
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   header,
   .reader-header,
   .header-top,
@@ -1113,21 +1288,22 @@ body.contrast-inverted {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    background: #ffffff !important;
+    background: var(--reader-surface, #ffffff) !important;
   }
 
   html,
   body,
   body.va-reader-body {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
+    font-family: var(--font-family, system-ui, sans-serif) !important;
   }
 
   .reader-container {
@@ -1136,16 +1312,16 @@ body.contrast-inverted {
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
   }
 
   .reader-document {
     display: block !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
@@ -1154,53 +1330,59 @@ body.contrast-inverted {
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
+    font-family: var(--font-family, system-ui, sans-serif) !important;
   }
 
   .reader-document * {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
-    background: transparent !important;
-    background-color: transparent !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
     box-shadow: none !important;
     text-shadow: none !important;
   }
 
   .reader-page {
     display: block !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
     page-break-after: always;
     break-after: page;
-    margin: 0 0 24px 0 !important;
-    padding: 0 !important;
+    margin: 0 0 20px 0 !important;
+    padding: 0.2in 0 !important;
+    border-bottom: none !important;
   }
 
   .reader-page:last-child {
     page-break-after: auto;
     break-after: auto;
+    margin-bottom: 0 !important;
   }
 
   .page-header-tag {
     display: block !important;
-    color: #555555 !important;
-    -webkit-text-fill-color: #555555 !important;
+    color: var(--reader-text, #555555) !important;
+    -webkit-text-fill-color: var(--reader-text, #555555) !important;
+    opacity: 0.75 !important;
     font-size: 0.75rem !important;
-    border-bottom: 1px solid #cccccc !important;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.4) !important;
     margin-bottom: 16px !important;
     padding-bottom: 4px !important;
+    font-family: system-ui, -apple-system, sans-serif !important;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
   }
 
   .reader-document p {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
-    line-height: var(--leading, 1.5) !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
+    line-height: var(--leading, 1.6) !important;
     letter-spacing: var(--tracking, 0px) !important;
     word-spacing: var(--spacing, 0px) !important;
-    font-size: calc(var(--font-size, 18px) * 0.85) !important;
+    font-size: var(--font-size, 18px) !important;
+    margin-bottom: 14px !important;
     orphans: 3;
     widows: 3;
   }
@@ -1211,16 +1393,16 @@ body.contrast-inverted {
   .reader-document h4,
   .reader-document h5,
   .reader-document h6 {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
     page-break-after: avoid;
     break-after: avoid;
   }
 
   .va-bionic-fix {
     font-weight: 700 !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #111111) !important;
+    -webkit-text-fill-color: var(--reader-text, #111111) !important;
   }
 }
 

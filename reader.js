@@ -365,6 +365,126 @@ function saveReaderSettings() {
 }
 
 // -------------------------------------------------------------
+// WCAG 2.1 Color Luminance & Contrast Calculation
+// -------------------------------------------------------------
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  let clean = hex.trim().replace(/^#/, '');
+  if (clean.length === 3) {
+    clean = clean.split('').map((c) => c + c).join('');
+  }
+  if (clean.length !== 6) return null;
+  const num = parseInt(clean, 16);
+  if (isNaN(num)) return null;
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  };
+}
+
+function getRelativeLuminance(rgb) {
+  const srgb = [rgb.r, rgb.g, rgb.b].map((val) => {
+    const s = val / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+function getWcagContrast(fgHex, bgHex) {
+  const fgRgb = hexToRgb(fgHex);
+  const bgRgb = hexToRgb(bgHex);
+  if (!fgRgb || !bgRgb) {
+    return { ratio: 1, ratioFormatted: '1.0:1', grade: 'Fail', gradeClass: 'grade-fail' };
+  }
+  const l1 = getRelativeLuminance(fgRgb);
+  const l2 = getRelativeLuminance(bgRgb);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  const ratio = (lighter + 0.05) / (darker + 0.05);
+
+  let grade = 'Fail';
+  let gradeClass = 'grade-fail';
+  if (ratio >= 7.0) {
+    grade = 'AAA Pass';
+    gradeClass = 'grade-aaa';
+  } else if (ratio >= 4.5) {
+    grade = 'AA Pass';
+    gradeClass = 'grade-aa';
+  } else if (ratio >= 3.0) {
+    grade = 'AA Large';
+    gradeClass = 'grade-aa-large';
+  }
+
+  return {
+    ratio,
+    ratioFormatted: `${ratio.toFixed(1)}:1`,
+    grade,
+    gradeClass
+  };
+}
+
+function normalizeHex(val) {
+  if (!val) return null;
+  let str = val.trim();
+  if (!str.startsWith('#')) str = '#' + str;
+  if (/^#[0-9A-Fa-f]{6}$/.test(str)) {
+    return str.toLowerCase();
+  }
+  if (/^#[0-9A-Fa-f]{3}$/.test(str)) {
+    return ('#' + str[1] + str[1] + str[2] + str[2] + str[3] + str[3]).toLowerCase();
+  }
+  return null;
+}
+
+function updateReaderCustomContrastUI() {
+  const customContrastCard = document.getElementById('reader-custom-contrast-card');
+  if (!customContrastCard) return;
+
+  const fontColor = currentReaderSettings.customFontColor || '#111111';
+  const bgColor = currentReaderSettings.customBgColor || '#fbf0d9';
+
+  const customTextColorInput = document.getElementById('reader-custom-text-color');
+  const customTextHexInput = document.getElementById('reader-custom-text-hex');
+  const customBgColorInput = document.getElementById('reader-custom-bg-color');
+  const customBgHexInput = document.getElementById('reader-custom-bg-hex');
+  const wcagRatioVal = document.getElementById('reader-wcag-ratio-val');
+  const wcagGradeBadge = document.getElementById('reader-wcag-grade-badge');
+  const contrastSamplePreview = document.getElementById('reader-contrast-sample-preview');
+
+  if (customTextColorInput && customTextColorInput.value !== fontColor) {
+    customTextColorInput.value = fontColor;
+  }
+  if (customTextHexInput && document.activeElement !== customTextHexInput) {
+    customTextHexInput.value = fontColor.toUpperCase();
+  }
+  if (customBgColorInput && customBgColorInput.value !== bgColor) {
+    customBgColorInput.value = bgColor;
+  }
+  if (customBgHexInput && document.activeElement !== customBgHexInput) {
+    customBgHexInput.value = bgColor.toUpperCase();
+  }
+
+  const contrast = getWcagContrast(fontColor, bgColor);
+  if (wcagRatioVal) {
+    wcagRatioVal.textContent = contrast.ratioFormatted;
+  }
+  if (wcagGradeBadge) {
+    wcagGradeBadge.textContent = contrast.grade;
+    wcagGradeBadge.className = `wcag-grade-badge ${contrast.gradeClass}`;
+  }
+  if (contrastSamplePreview) {
+    contrastSamplePreview.style.color = fontColor;
+    contrastSamplePreview.style.backgroundColor = bgColor;
+  }
+
+  const isCustom = currentReaderSettings.contrast === 'custom';
+  customContrastCard.classList.toggle('custom-active', isCustom);
+  customContrastCard.classList.toggle('hidden', !isCustom);
+  customContrastCard.style.display = isCustom ? 'flex' : 'none';
+}
+
+// -------------------------------------------------------------
 // Toolbar Controls Wiring
 // -------------------------------------------------------------
 function initToolbarControls() {
@@ -444,9 +564,99 @@ function initToolbarControls() {
   // Irlen Contrast Mode
   contrastSelect.addEventListener('change', (e) => {
     currentReaderSettings.contrast = e.target.value;
+    updateReaderCustomContrastUI();
     applyAllReaderStyles();
+    preparePrintStylesheet();
     saveReaderSettings();
   });
+
+  // Custom Color Contrast Chooser Listeners
+  const customTextColorInput = document.getElementById('reader-custom-text-color');
+  const customTextHexInput = document.getElementById('reader-custom-text-hex');
+  const customBgColorInput = document.getElementById('reader-custom-bg-color');
+  const customBgHexInput = document.getElementById('reader-custom-bg-hex');
+
+  if (customTextColorInput) {
+    customTextColorInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      currentReaderSettings.customFontColor = val;
+      if (customTextHexInput) customTextHexInput.value = val.toUpperCase();
+      currentReaderSettings.contrast = 'custom';
+      if (contrastSelect) contrastSelect.value = 'custom';
+      updateReaderCustomContrastUI();
+      applyAllReaderStyles();
+      preparePrintStylesheet();
+    });
+    customTextColorInput.addEventListener('change', () => {
+      saveReaderSettings();
+    });
+  }
+
+  if (customTextHexInput) {
+    customTextHexInput.addEventListener('input', (e) => {
+      const valid = normalizeHex(e.target.value);
+      if (valid) {
+        currentReaderSettings.customFontColor = valid;
+        if (customTextColorInput) customTextColorInput.value = valid;
+        currentReaderSettings.contrast = 'custom';
+        if (contrastSelect) contrastSelect.value = 'custom';
+        updateReaderCustomContrastUI();
+        applyAllReaderStyles();
+        preparePrintStylesheet();
+      }
+    });
+    customTextHexInput.addEventListener('change', () => {
+      const valid = normalizeHex(customTextHexInput.value);
+      if (valid) {
+        currentReaderSettings.customFontColor = valid;
+        customTextHexInput.value = valid.toUpperCase();
+      } else {
+        customTextHexInput.value = (currentReaderSettings.customFontColor || '#111111').toUpperCase();
+      }
+      saveReaderSettings();
+    });
+  }
+
+  if (customBgColorInput) {
+    customBgColorInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      currentReaderSettings.customBgColor = val;
+      if (customBgHexInput) customBgHexInput.value = val.toUpperCase();
+      currentReaderSettings.contrast = 'custom';
+      if (contrastSelect) contrastSelect.value = 'custom';
+      updateReaderCustomContrastUI();
+      applyAllReaderStyles();
+      preparePrintStylesheet();
+    });
+    customBgColorInput.addEventListener('change', () => {
+      saveReaderSettings();
+    });
+  }
+
+  if (customBgHexInput) {
+    customBgHexInput.addEventListener('input', (e) => {
+      const valid = normalizeHex(e.target.value);
+      if (valid) {
+        currentReaderSettings.customBgColor = valid;
+        if (customBgColorInput) customBgColorInput.value = valid;
+        currentReaderSettings.contrast = 'custom';
+        if (contrastSelect) contrastSelect.value = 'custom';
+        updateReaderCustomContrastUI();
+        applyAllReaderStyles();
+        preparePrintStylesheet();
+      }
+    });
+    customBgHexInput.addEventListener('change', () => {
+      const valid = normalizeHex(customBgHexInput.value);
+      if (valid) {
+        currentReaderSettings.customBgColor = valid;
+        customBgHexInput.value = valid.toUpperCase();
+      } else {
+        customBgHexInput.value = (currentReaderSettings.customBgColor || '#fbf0d9').toUpperCase();
+      }
+      saveReaderSettings();
+    });
+  }
 
   // Bionic
   bionicToggle.addEventListener('change', (e) => {
@@ -548,30 +758,34 @@ function initToolbarControls() {
   if (printBtn) {
     printBtn.addEventListener('click', async () => {
       preparePrintStylesheet();
-      const isMultiPage = currentPdfDocument && currentTotalPages > 1;
+      const isMultiPage = (currentTotalPages > 1) || (currentLoadedPages && currentLoadedPages.length > 1);
       if (isMultiPage) {
         showReaderLoading('Preparing document pages for printing...');
         await ensureAllPagesLoaded();
         hideReaderLoading();
         renderAllPagesForPrint();
       }
-      window.print();
-      if (isMultiPage) {
-        restoreAfterPrint();
-      }
+      setTimeout(() => {
+        window.print();
+      }, 60);
     });
   }
 
-  window.addEventListener('beforeprint', async () => {
+  window.addEventListener('beforeprint', () => {
     preparePrintStylesheet();
-    if (currentPdfDocument && currentTotalPages > 1) {
-      await ensureAllPagesLoaded();
+    if (!isPrintingMultiPage && ((currentTotalPages > 1) || (currentLoadedPages && currentLoadedPages.length > 1))) {
       renderAllPagesForPrint();
     }
   });
 
   window.addEventListener('afterprint', () => {
     restoreAfterPrint();
+  });
+
+  window.addEventListener('focus', () => {
+    if (isPrintingMultiPage) {
+      setTimeout(restoreAfterPrint, 80);
+    }
   });
 
   // Open file button in header
@@ -893,7 +1107,7 @@ async function checkReaderGpuAdmission() {
 const PAPER_PRESETS = {
   letter: {
     name: 'Standard Letter',
-    cssPageSize: 'letter portrait',
+    cssPageSize: '8.5in 11in',
     sizePrint: '8.5in 11in',
     widthIn: 8.5,
     heightIn: 11,
@@ -903,7 +1117,7 @@ const PAPER_PRESETS = {
   },
   a4: {
     name: 'A4',
-    cssPageSize: 'a4 portrait',
+    cssPageSize: '210mm 297mm',
     sizePrint: '210mm 297mm',
     widthIn: 8.27,
     heightIn: 11.69,
@@ -913,7 +1127,7 @@ const PAPER_PRESETS = {
   },
   folio: {
     name: 'Philippine Long / Folio',
-    cssPageSize: '8.5in 13in portrait',
+    cssPageSize: '8.5in 13in',
     sizePrint: '8.5in 13in',
     widthIn: 8.5,
     heightIn: 13,
@@ -923,7 +1137,7 @@ const PAPER_PRESETS = {
   },
   legal: {
     name: 'US Legal',
-    cssPageSize: 'legal portrait',
+    cssPageSize: '8.5in 14in',
     sizePrint: '8.5in 14in',
     widthIn: 8.5,
     heightIn: 14,
@@ -942,7 +1156,7 @@ function getActivePaperFormat() {
     const minH = Math.round(baseW * (h / w));
     return {
       name: 'Custom',
-      cssPageSize: `${w}in ${h}in portrait`,
+      cssPageSize: `${w}in ${h}in`,
       sizePrint: `${w}in ${h}in`,
       widthIn: w,
       heightIn: h,
@@ -983,10 +1197,54 @@ function preparePrintStylesheet() {
 
   const paper = getActivePaperFormat();
 
+  // Compute exact surface background color and text color based on active settings
+  let surfaceColor = '#ffffff';
+  let textColor = '#111111';
+
+  if (currentReaderSettings.contrast === 'custom') {
+    surfaceColor = currentReaderSettings.customBgColor || '#fbf0d9';
+    textColor = currentReaderSettings.customFontColor || '#111111';
+  } else if (currentReaderSettings.contrast === 'cream') {
+    surfaceColor = '#fbf5e6';
+    textColor = '#222222';
+  } else if (currentReaderSettings.contrast === 'peach') {
+    surfaceColor = '#fff1e8';
+    textColor = '#26211f';
+  } else if (currentReaderSettings.contrast === 'mint') {
+    surfaceColor = '#ecf7ed';
+    textColor = '#1b261b';
+  } else if (currentReaderSettings.contrast === 'navy') {
+    surfaceColor = '#0f1f33';
+    textColor = '#ffd796';
+  } else if (currentReaderSettings.contrast === 'dark') {
+    surfaceColor = '#1e1e1e';
+    textColor = '#e8e8e8';
+  } else if (currentReaderSettings.contrast === 'inverted') {
+    surfaceColor = '#0a0a0a';
+    textColor = '#ffff00';
+  }
+
+  // If explicit font color is chosen (and not in inverted/dark where preset fg matters)
+  if (currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default' && currentReaderSettings.contrast !== 'custom') {
+    textColor = currentReaderSettings.fontColor;
+  }
+
+  const activeFont = currentReaderSettings.font || 'Lexend';
+  const activeFontSize = currentReaderSettings.fontSize ? `${currentReaderSettings.fontSize}px` : '18px';
+  const activeTracking = currentReaderSettings.tracking ? `${currentReaderSettings.tracking}px` : '0px';
+  const activeSpacing = currentReaderSettings.spacing ? `${currentReaderSettings.spacing}px` : '0px';
+  const activeLeading = currentReaderSettings.leading || 1.6;
+
   styleEl.textContent = `
     @page {
       size: ${paper.cssPageSize};
       margin: 0.5in;
+    }
+
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
 
     /* Hide all UI chrome, toolbars, sidebars, settings drawers, and audio playback widgets */
@@ -1027,46 +1285,38 @@ function preparePrintStylesheet() {
       visibility: hidden !important;
     }
 
-    /* Force document text container and page canvas to 100% visible overflow with clean white background and black text */
     html,
     body,
     body.va-reader-body {
-      background: #ffffff !important;
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
+      background: ${surfaceColor} !important;
+      background-color: ${surfaceColor} !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
       margin: 0 !important;
       padding: 0 !important;
       width: 100% !important;
       height: auto !important;
-      min-height: 100% !important;
       overflow: visible !important;
+      font-family: ${activeFont}, system-ui, sans-serif !important;
     }
 
-    .reader-layout {
-      display: block !important;
-      width: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      background: #ffffff !important;
-    }
-
+    .reader-layout,
     .reader-container {
       margin: 0 !important;
       padding: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
       overflow: visible !important;
-      background: #ffffff !important;
-      background-color: #ffffff !important;
+      background: ${surfaceColor} !important;
+      background-color: ${surfaceColor} !important;
     }
 
     .reader-document {
       display: block !important;
-      background: #ffffff !important;
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
+      background: ${surfaceColor} !important;
+      background-color: ${surfaceColor} !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
       box-shadow: none !important;
       border: none !important;
       border-radius: 0 !important;
@@ -1076,33 +1326,31 @@ function preparePrintStylesheet() {
       max-width: 100% !important;
       min-height: auto !important;
       overflow: visible !important;
+      font-family: ${activeFont}, system-ui, sans-serif !important;
     }
 
     .reader-document * {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      background: transparent !important;
-      background-color: transparent !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
       box-shadow: none !important;
       text-shadow: none !important;
     }
 
     .reader-page {
       display: block !important;
-      background: #ffffff !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
+      background: ${surfaceColor} !important;
+      background-color: ${surfaceColor} !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
       width: 100% !important;
       max-width: 100% !important;
-      min-height: calc(${paper.heightIn}in - 1in) !important;
       box-sizing: border-box !important;
       overflow: visible !important;
       page-break-after: always;
       break-after: page;
-      page-break-inside: avoid;
-      break-inside: avoid;
-      margin: 0 0 24px 0 !important;
-      padding: 0 !important;
+      margin: 0 0 20px 0 !important;
+      padding: 0.2in 0 !important;
+      border-bottom: none !important;
     }
 
     .reader-page:last-child {
@@ -1113,21 +1361,25 @@ function preparePrintStylesheet() {
 
     .page-header-tag {
       display: block !important;
-      color: #555555 !important;
-      -webkit-text-fill-color: #555555 !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
+      opacity: 0.75 !important;
       font-size: 0.75rem !important;
-      border-bottom: 1px solid #cccccc !important;
+      border-bottom: 1px solid rgba(128, 128, 128, 0.4) !important;
       margin-bottom: 16px !important;
       padding-bottom: 4px !important;
+      font-family: system-ui, -apple-system, sans-serif !important;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
     }
 
     .reader-document p {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      line-height: var(--leading, 1.5) !important;
-      letter-spacing: var(--tracking, 0px) !important;
-      word-spacing: var(--spacing, 0px) !important;
-      font-size: calc(var(--font-size, 18px) * 0.85) !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
+      line-height: ${activeLeading} !important;
+      letter-spacing: ${activeTracking} !important;
+      word-spacing: ${activeSpacing} !important;
+      font-size: ${activeFontSize} !important;
       margin-bottom: 14px !important;
       orphans: 3;
       widows: 3;
@@ -1139,16 +1391,16 @@ function preparePrintStylesheet() {
     .reader-document h4,
     .reader-document h5,
     .reader-document h6 {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
       page-break-after: avoid;
       break-after: avoid;
     }
 
     .va-bionic-fix {
       font-weight: 700 !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
+      color: ${textColor} !important;
+      -webkit-text-fill-color: ${textColor} !important;
     }
   `;
 }
@@ -1254,6 +1506,7 @@ function updateToolbarUI() {
 
   const contrastEl = document.getElementById('reader-contrast');
   if (contrastEl) contrastEl.value = currentReaderSettings.contrast || 'default';
+  updateReaderCustomContrastUI();
 
   const bionicEl = document.getElementById('reader-bionic-toggle');
   if (bionicEl) bionicEl.checked = Boolean(currentReaderSettings.bionic);
