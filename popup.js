@@ -1163,6 +1163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function checkGpuAdmissionAndInfo() {
     let isSupported = false;
     let meetsRequirements = false;
+    let isIntegrated = false;
     let chipName = 'Detecting...';
 
     try {
@@ -1170,6 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const info = await KokoroEngine.getGpuDeviceInfo();
         isSupported = info.supported;
         meetsRequirements = info.meetsRequirements;
+        isIntegrated = Boolean(info.isIntegrated);
         chipName = info.chipName;
       } else if (typeof navigator !== 'undefined' && navigator.gpu) {
         const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -1182,7 +1184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chipName = info.description || info.device || info.architecture || info.vendor || 'Generic GPU';
           }
           const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
-          meetsRequirements = (maxStorage >= 268435456); // 256 MB
+          meetsRequirements = (maxStorage >= 268435456 && !adapter.isFallbackAdapter);
         } else {
           chipName = 'None (WebGPU unavailable)';
         }
@@ -1199,12 +1201,14 @@ document.addEventListener('DOMContentLoaded', () => {
       gpuChipNameEl.textContent = chipName;
     }
 
-    // Hardware admission lock for Turbo Mode option (Requirement 2)
+    // Hardware admission lock for Turbo Mode option (Requires Dedicated GPU)
     const turboOption = ttsEngineTierSelect?.querySelector('option[value="webgpu"]');
     if (turboOption) {
-      if (!isSupported || !meetsRequirements) {
+      if (!isSupported || !meetsRequirements || isIntegrated) {
         turboOption.disabled = true;
-        turboOption.textContent = 'Turbo Mode (GPU / ~330 MB) (Unsupported Hardware)';
+        turboOption.textContent = isIntegrated
+          ? 'Turbo Mode (GPU / ~330 MB) (Requires Dedicated GPU)'
+          : 'Turbo Mode (GPU / ~330 MB) (Unsupported Hardware)';
         if (currentSettings.ttsEngineTier === 'webgpu') {
           currentSettings.ttsEngineTier = 'wasm';
           previousTier = 'wasm';
@@ -1217,7 +1221,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    return { isSupported, meetsRequirements, chipName };
+    return { isSupported, meetsRequirements, isIntegrated, chipName };
   }
 
   // TTS Engine Tier Selector (Universal WASM vs Turbo WebGPU)
@@ -1226,10 +1230,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const chosenTier = e.target.value;
 
       if (chosenTier === 'webgpu') {
-        // 1. Hardware admission check (WebGPU & 256 MB buffer limit)
+        // 1. Hardware admission check (WebGPU, 256 MB buffer limit, and dedicated GPU requirement)
         const gpuStatus = await checkGpuAdmissionAndInfo();
-        if (!gpuStatus.isSupported || !gpuStatus.meetsRequirements) {
-          alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on your graphics hardware. Reverting to Lightweight Mode (CPU).');
+        if (!gpuStatus.isSupported || !gpuStatus.meetsRequirements || gpuStatus.isIntegrated) {
+          if (gpuStatus.isIntegrated) {
+            alert(`WebGPU Turbo Mode requires a dedicated graphics card (dGPU) with dedicated VRAM. Your system is using an integrated GPU (${gpuStatus.chipName}). Reverting to Lightweight Mode (CPU).`);
+          } else {
+            alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on a dedicated graphics card. Reverting to Lightweight Mode (CPU).');
+          }
           ttsEngineTierSelect.value = 'wasm';
           currentSettings.ttsEngineTier = 'wasm';
           previousTier = 'wasm';

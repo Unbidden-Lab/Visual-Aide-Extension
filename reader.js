@@ -1380,9 +1380,13 @@ function initToolbarControls() {
     readerTierSelect.addEventListener('change', async (e) => {
       const chosenTier = e.target.value;
       if (chosenTier === 'webgpu') {
-        const supported = await isWebGpuSupported(268435456);
-        if (!supported) {
-          alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on your graphics hardware. Reverting to Lightweight Mode (CPU).');
+        const gpuStatus = await checkReaderGpuAdmission();
+        if (!gpuStatus.isSupported || !gpuStatus.meetsRequirements || gpuStatus.isIntegrated) {
+          if (gpuStatus.isIntegrated) {
+            alert(`WebGPU Turbo Mode requires a dedicated graphics card (dGPU) with dedicated VRAM. Your system is using an integrated GPU (${gpuStatus.chipName || 'Integrated GPU'}). Reverting to Lightweight Mode (CPU).`);
+          } else {
+            alert('WebGPU Turbo Mode requires at least 256 MB buffer binding support on a dedicated GPU. Reverting to Lightweight Mode (CPU).');
+          }
           readerTierSelect.value = 'wasm';
           currentReaderSettings.ttsEngineTier = 'wasm';
           previousReaderTier = 'wasm';
@@ -1448,17 +1452,21 @@ function updateReaderNeuralTierVisibility(voiceId) {
 async function checkReaderGpuAdmission() {
   let isSupported = false;
   let meetsRequirements = false;
+  let isIntegrated = false;
+  let chipName = '';
   try {
     if (typeof KokoroEngine !== 'undefined' && typeof KokoroEngine.getGpuDeviceInfo === 'function') {
       const info = await KokoroEngine.getGpuDeviceInfo();
       isSupported = info.supported;
       meetsRequirements = info.meetsRequirements;
+      isIntegrated = Boolean(info.isIntegrated);
+      chipName = info.chipName || '';
     } else if (typeof navigator !== 'undefined' && navigator.gpu) {
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
       if (adapter) {
         isSupported = true;
         const maxStorage = adapter.limits?.maxStorageBufferBindingSize || 0;
-        meetsRequirements = (maxStorage >= 268435456);
+        meetsRequirements = (maxStorage >= 268435456 && !adapter.isFallbackAdapter);
       }
     }
   } catch (_) {}
@@ -1466,9 +1474,11 @@ async function checkReaderGpuAdmission() {
   const tierSelect = document.getElementById('reader-tts-engine-tier');
   const turboOption = tierSelect?.querySelector('option[value="webgpu"]');
   if (turboOption) {
-    if (!isSupported || !meetsRequirements) {
+    if (!isSupported || !meetsRequirements || isIntegrated) {
       turboOption.disabled = true;
-      turboOption.textContent = 'Turbo (GPU / ~330 MB) (Unsupported Hardware)';
+      turboOption.textContent = isIntegrated
+        ? 'Turbo (GPU / ~330 MB) (Requires Dedicated GPU)'
+        : 'Turbo (GPU / ~330 MB) (Unsupported Hardware)';
       if (currentReaderSettings.ttsEngineTier === 'webgpu') {
         currentReaderSettings.ttsEngineTier = 'wasm';
         previousReaderTier = 'wasm';
@@ -1480,6 +1490,8 @@ async function checkReaderGpuAdmission() {
       turboOption.textContent = 'Turbo (GPU / ~330 MB)';
     }
   }
+
+  return { isSupported, meetsRequirements, isIntegrated, chipName };
 }
 
 // -------------------------------------------------------------

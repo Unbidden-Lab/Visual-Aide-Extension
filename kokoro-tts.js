@@ -95,19 +95,189 @@ function getOrCreateWorker() {
 }
 
 /**
+ * Query active WebGL renderer string for deep GPU hardware identification
+ */
+function getWebGLRendererString() {
+  try {
+    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!canvas) return '';
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return '';
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!debugInfo) return '';
+    return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
+ * Classify GPU hardware as discrete (dGPU), integrated (iGPU), software, or unknown.
+ * Accurately differentiates AMD RDNA 2/3 discrete cards from RDNA 2/3 integrated APUs,
+ * as well as Intel Arc discrete cards from Intel Iris/UHD/Core Ultra integrated GPUs.
+ *
+ * @param {string} rawText - Combined WebGPU info and WebGL renderer string
+ * @param {GPUAdapter|null} adapter - WebGPU adapter object
+ * @returns {{ isIntegrated: boolean, isDiscrete: boolean, isSoftware: boolean, type: string }}
+ */
+function classifyGpuHardware(rawText, adapter = null) {
+  if (adapter?.isFallbackAdapter) {
+    return { isIntegrated: true, isDiscrete: false, isSoftware: true, type: 'Software Renderer' };
+  }
+
+  const str = String(rawText || '')
+    .toLowerCase()
+    .replace(/\((?:r|tm)\)/gi, ' ')
+    .replace(/\s+/g, ' ');
+
+  // 1. Software / Fallback renderers
+  if (/\b(swiftshader|llvmpipe|lavapipe|basic\s*render\s*driver|software\s*rasterizer|warp)\b/i.test(str)) {
+    return { isIntegrated: true, isDiscrete: false, isSoftware: true, type: 'Software Renderer' };
+  }
+
+  // 2. Qualcomm / ARM Adreno (Integrated mobile/SoC)
+  if (/\b(adreno|snapdragon|qualcomm)\b/i.test(str)) {
+    return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+  }
+
+  // 3. Apple Silicon (Integrated SoC)
+  if (/\b(apple\s*m\d+|apple\s*gpu)\b/i.test(str)) {
+    return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated SoC' };
+  }
+
+  // 4. NVIDIA: Desktop and laptop NVIDIA GeForce/RTX/Quadro/Titan cards are discrete dGPUs
+  if (/\b(geforce|rtx|gtx|quadro|titan|tesla|nvidia)\b/i.test(str)) {
+    return { isIntegrated: false, isDiscrete: true, isSoftware: false, type: 'Dedicated GPU' };
+  }
+
+  // 5. AMD GPUs: Distinguish discrete Radeon cards from integrated RDNA 2/3/3.5 APUs
+  const isAmd = /\b(amd|radeon|ati|advanced\s+micro\s+devices)\b/i.test(str);
+  if (isAmd) {
+    // Dedicated AMD identifiers:
+    // - RX series: RX 7900, RX 7800 XT, RX 6700 XT, RX 6800M, RX 7600S, RX 580, RX 5500, etc.
+    // - Radeon Pro W / WX / VII: Pro W7900, Pro W6800, Pro WX 8200
+    // - Radeon VII, Vega 56, Vega 64, Fury
+    // - R9 / R7 discrete desktop cards
+    const isDedicatedAmd = (
+      /\brx\s*\d{3,4}[a-z]*\b/i.test(str) ||
+      /\bpro\s+(w\d{4}|wx\s*\d{4}|vii)\b/i.test(str) ||
+      /\b(radeon\s+vii|vega\s*56|vega\s*64|fury)\b/i.test(str) ||
+      /\br9\s+[a-z]?\d{3}[a-z]*\b/i.test(str)
+    );
+
+    if (isDedicatedAmd) {
+      return { isIntegrated: false, isDiscrete: true, isSoftware: false, type: 'Dedicated GPU' };
+    }
+
+    // Integrated AMD APU identifiers:
+    // - RDNA 2/3/3.5 mobile APU models: 890m, 880m, 780m, 760m, 740m, 680m, 660m, 610m
+    // - Vega APU: Vega 3, Vega 6, Vega 7, Vega 8, Vega 9, Vega 10, Vega 11
+    // - Generic Windows / DirectX string: "AMD Radeon Graphics" / "AMD Radeon(TM) Graphics"
+    // - APU codenames or "APU" designation
+    const isIntegratedAmd = (
+      /\b(890m|880m|780m|760m|740m|680m|660m|610m)\b/i.test(str) ||
+      /\bvega\s*(?:[1-9]|10|11)\b/i.test(str) ||
+      /\bradeon\s*(?:graphics)?\b/i.test(str) ||
+      /\b(apu|picasso|renoir|lucienne|cezanne|barcelo|rembrandt|phoenix|hawk\s*point|strix\s*point|mendocino)\b/i.test(str)
+    );
+
+    if (isIntegratedAmd) {
+      return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+    }
+
+    // If architecture is rdna-2/rdna-3/gfx10/gfx11 without RX branding, classify as Integrated GPU
+    if (/\b(rdna|gfx\d+)\b/i.test(str)) {
+      return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+    }
+
+    // Fallback for AMD without dedicated indicators
+    return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+  }
+
+  // 6. Intel GPUs: Distinguish discrete Arc cards from integrated UHD/Iris/Meteor Lake Arc
+  const isIntel = /\b(intel)\b/i.test(str);
+  if (isIntel) {
+    // Dedicated Intel Arc A-series / B-series / Pro / Iris Xe MAX / DG1
+    const isDedicatedIntel = (
+      /\barc\s+(a[3-7]\d{2}[a-z]*|b[5-7]\d{2}[a-z]*|pro\s+a\d{2}[a-z]*)\b/i.test(str) ||
+      /\b(iris\s*xe\s*max|dg1)\b/i.test(str)
+    );
+
+    if (isDedicatedIntel) {
+      return { isIntegrated: false, isDiscrete: true, isSoftware: false, type: 'Dedicated GPU' };
+    }
+
+    // Integrated Intel:
+    // - UHD Graphics / HD Graphics
+    // - Iris / Iris Plus / Iris Xe (without MAX)
+    // - Meteor Lake / Core Ultra integrated Arc: "Intel Arc Graphics" (without A/B/Pro model number)
+    const isIntegratedIntel = (
+      /\b(uhd|hd)\s+graphics\b/i.test(str) ||
+      /\biris\s*(?:plus)?(?:\s*xe)?\s*graphics\b/i.test(str) ||
+      /\biris\b/i.test(str) ||
+      /\barc\s*graphics\b/i.test(str) ||
+      /\b(core\s+ultra|alder\s*lake|raptor\s*lake|meteor\s*lake|lunar\s*lake|arrow\s*lake)\b/i.test(str)
+    );
+
+    if (isIntegratedIntel) {
+      return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+    }
+
+    // Fallback for Intel without dedicated indicators
+    return { isIntegrated: true, isDiscrete: false, isSoftware: false, type: 'Integrated GPU' };
+  }
+
+  // Fallback if unidentified
+  return { isIntegrated: false, isDiscrete: false, isSoftware: false, type: 'Unknown GPU' };
+}
+
+/**
+ * Extract clean display name from WebGPU description or WebGL ANGLE string
+ */
+function extractCleanGpuName(rawDescription, webGlString) {
+  if (rawDescription && rawDescription !== 'Generic GPU' && rawDescription.length > 3) {
+    return rawDescription;
+  }
+  if (webGlString) {
+    const angleMatch = webGlString.match(/ANGLE\s*\([^,]+,\s*(.+?)(?:\s+(?:Direct3D\d*|Vulkan\d*|OpenGL\d*|vs_\d|ps_\d)|\s*,\s*(?:D3D|driver|\d))/i);
+    if (angleMatch && angleMatch[1]) {
+      return angleMatch[1].trim();
+    }
+    return webGlString;
+  }
+  return 'Active GPU';
+}
+
+/**
  * Check if WebGPU is supported and available on this device/browser
  * @param {number} minStorageBufferSize - Minimum required buffer binding size (e.g. 268435456 for 256MB)
+ * @param {boolean} requireDedicated - Require discrete GPU (gate out integrated graphics)
  */
-async function isWebGpuSupported(minStorageBufferSize = 0) {
+async function isWebGpuSupported(minStorageBufferSize = 0, requireDedicated = true) {
   if (typeof navigator === 'undefined' || !navigator.gpu) {
     return false;
   }
   try {
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) return false;
+    if (adapter.isFallbackAdapter) return false;
     if (minStorageBufferSize > 0) {
       const size = adapter.limits?.maxStorageBufferBindingSize || 0;
       if (size < minStorageBufferSize) return false;
+    }
+    if (requireDedicated) {
+      let adapterDesc = '';
+      if (adapter.info) {
+        adapterDesc = `${adapter.info.vendor || ''} ${adapter.info.architecture || ''} ${adapter.info.device || ''} ${adapter.info.description || ''}`;
+      } else if (typeof adapter.requestAdapterInfo === 'function') {
+        const info = await adapter.requestAdapterInfo();
+        adapterDesc = `${info.vendor || ''} ${info.architecture || ''} ${info.device || ''} ${info.description || ''}`;
+      }
+      const webGlStr = getWebGLRendererString();
+      const classification = classifyGpuHardware(`${adapterDesc} ${webGlStr}`, adapter);
+      if (classification.isIntegrated || classification.isSoftware) {
+        return false;
+      }
     }
     return true;
   } catch (err) {
@@ -120,32 +290,83 @@ async function isWebGpuSupported(minStorageBufferSize = 0) {
  */
 async function getGpuDeviceInfo() {
   if (typeof navigator === 'undefined' || !navigator.gpu) {
-    return { supported: false, chipName: 'None (WebGPU unsupported)', maxStorageBuffer: 0, meetsRequirements: false };
+    return {
+      supported: false,
+      chipName: 'None (WebGPU unsupported)',
+      cleanName: 'None',
+      maxStorageBuffer: 0,
+      meetsRequirements: false,
+      isIntegrated: false,
+      isDiscrete: false,
+      isSoftware: false,
+      gpuType: 'Unsupported'
+    };
   }
   try {
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
     if (!adapter) {
-      return { supported: false, chipName: 'None (No GPU adapter)', maxStorageBuffer: 0, meetsRequirements: false };
+      return {
+        supported: false,
+        chipName: 'None (No GPU adapter)',
+        cleanName: 'None',
+        maxStorageBuffer: 0,
+        meetsRequirements: false,
+        isIntegrated: false,
+        isDiscrete: false,
+        isSoftware: false,
+        gpuType: 'None'
+      };
     }
-    let chipName = '';
+
+    let rawAdapterInfo = '';
+    let adapterDescription = '';
     if (adapter.info) {
-      chipName = adapter.info.description || adapter.info.device || adapter.info.architecture || adapter.info.vendor || 'Generic GPU';
+      adapterDescription = adapter.info.description || adapter.info.device || adapter.info.architecture || adapter.info.vendor || '';
+      rawAdapterInfo = `${adapter.info.vendor || ''} ${adapter.info.architecture || ''} ${adapter.info.device || ''} ${adapter.info.description || ''}`;
     } else if (typeof adapter.requestAdapterInfo === 'function') {
       const info = await adapter.requestAdapterInfo();
-      chipName = info.description || info.device || info.architecture || info.vendor || 'Generic GPU';
+      adapterDescription = info.description || info.device || info.architecture || info.vendor || '';
+      rawAdapterInfo = `${info.vendor || ''} ${info.architecture || ''} ${info.device || ''} ${info.description || ''}`;
     }
+
+    const webGlRenderer = getWebGLRendererString();
+    const combinedGpuString = `${rawAdapterInfo} ${webGlRenderer}`.trim();
+    const classification = classifyGpuHardware(combinedGpuString, adapter);
+    const cleanName = extractCleanGpuName(adapterDescription, webGlRenderer);
+
+    let formattedChipName = cleanName;
+    if (classification.type && classification.type !== 'Unknown GPU') {
+      formattedChipName = `${cleanName} (${classification.type})`;
+    }
+
     const maxStorageBuffer = adapter.limits?.maxStorageBufferBindingSize || 0;
-    const meetsRequirements = maxStorageBuffer >= 268435456; // 256 MB
+    const meetsRequirements = Boolean(maxStorageBuffer >= 268435456 && !classification.isIntegrated && !classification.isSoftware);
 
     return {
       supported: true,
-      chipName: chipName || 'Active GPU',
+      chipName: formattedChipName,
+      cleanName,
+      rawString: combinedGpuString,
       maxStorageBuffer,
       meetsRequirements,
+      isIntegrated: classification.isIntegrated,
+      isDiscrete: classification.isDiscrete,
+      isSoftware: classification.isSoftware,
+      gpuType: classification.type,
       adapter
     };
   } catch (e) {
-    return { supported: false, chipName: 'Error detecting GPU', maxStorageBuffer: 0, meetsRequirements: false };
+    return {
+      supported: false,
+      chipName: 'Error detecting GPU',
+      cleanName: 'Error',
+      maxStorageBuffer: 0,
+      meetsRequirements: false,
+      isIntegrated: false,
+      isDiscrete: false,
+      isSoftware: false,
+      gpuType: 'Error'
+    };
   }
 }
 
@@ -674,6 +895,7 @@ const KokoroEngine = {
   isKokoroVoice,
   isWebGpuSupported,
   getGpuDeviceInfo,
+  classifyGpuHardware,
   isKokoroModelCached,
   loadKokoroModel,
   getKokoroInstance,
