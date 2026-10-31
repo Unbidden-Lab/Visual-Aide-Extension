@@ -71,11 +71,188 @@ let previousReaderVoice = 'female';
 let previousReaderTier = 'wasm';
 
 // -------------------------------------------------------------
-// Natural Neural Voice Matcher (Aria for Female, Guy for Male)
 // -------------------------------------------------------------
-function getResolvedVoice(voices, gender = 'female') {
+// Voice Recognition & Filipino Language Helpers
+// -------------------------------------------------------------
+function isFilipinoVoice(voiceId) {
+  if (!voiceId) return false;
+  const id = String(voiceId).toLowerCase();
+  if (id === 'fil_blessica' || id === 'fil_angelo' || id.startsWith('fil_')) return true;
+  if (id.startsWith('fil-') || id.startsWith('tl-') || id === 'fil' || id === 'tl') return true;
+  if (id.includes('filipino') || id.includes('tagalog') || id.includes('blessica') || id.includes('angelo')) return true;
+  return false;
+}
+
+function getDiscoveredFilipinoVoices(voices) {
+  if (!voices || !Array.isArray(voices)) return [];
+  return voices.filter(v => {
+    const lang = (v.lang || '').toLowerCase();
+    const name = (v.name || '').toLowerCase();
+    return lang.startsWith('fil') || lang.startsWith('tl') ||
+      name.includes('filipino') || name.includes('tagalog') ||
+      name.includes('blessica') || name.includes('angelo');
+  });
+}
+
+function populateFilipinoVoiceDropdown(selectEl, voices, currentVoiceId) {
+  if (!selectEl) return;
+  const filGroup = selectEl.querySelector('#reader-voice-group-standard-filipino') ||
+    selectEl.querySelector('#voice-group-standard-filipino') ||
+    selectEl.querySelector('optgroup[label*="Filipino"]');
+  if (!filGroup) return;
+
+  const filVoices = getDiscoveredFilipinoVoices(voices);
+
+  if (!filVoices || filVoices.length === 0) {
+    if (filGroup.children.length === 0) {
+      const opt1 = document.createElement('option');
+      opt1.value = 'fil_blessica';
+      opt1.textContent = 'Blessica (Filipino)';
+      const opt2 = document.createElement('option');
+      opt2.value = 'fil_angelo';
+      opt2.textContent = 'Angelo (Filipino)';
+      filGroup.appendChild(opt1);
+      filGroup.appendChild(opt2);
+    }
+    if (currentVoiceId && Array.from(selectEl.options).some(o => o.value === currentVoiceId)) {
+      selectEl.value = currentVoiceId;
+    }
+    return;
+  }
+
+  const selectedVal = currentVoiceId || selectEl.value;
+  filGroup.innerHTML = '';
+  const seenKeys = new Set();
+
+  filVoices.forEach(voice => {
+    const opt = document.createElement('option');
+    let val = voice.voiceURI || voice.name;
+    let label = voice.name;
+
+    if (/\bblessica\b/i.test(voice.name)) {
+      if (!seenKeys.has('fil_blessica')) {
+        val = 'fil_blessica';
+      }
+      label = voice.name.includes('Natural') ? 'Blessica (Online Natural)' : (voice.name.includes('Microsoft') ? 'Blessica (Filipino)' : voice.name);
+    } else if (/\bangelo\b/i.test(voice.name)) {
+      if (!seenKeys.has('fil_angelo')) {
+        val = 'fil_angelo';
+      }
+      label = voice.name.includes('Natural') ? 'Angelo (Online Natural)' : (voice.name.includes('Microsoft') ? 'Angelo (Filipino)' : voice.name);
+    } else {
+      label = voice.name.replace(/^(Google|Microsoft|Apple)\s+/i, '').trim();
+      if (!label.toLowerCase().includes('filipino') && !label.toLowerCase().includes('tagalog')) {
+        label += ' (Filipino)';
+      }
+    }
+
+    if (seenKeys.has(val)) return;
+    seenKeys.add(val);
+
+    opt.value = val;
+    opt.textContent = label;
+    opt.setAttribute('data-lang', voice.lang || 'fil-PH');
+    filGroup.appendChild(opt);
+  });
+
+  if (!seenKeys.has('fil_blessica')) {
+    const opt = document.createElement('option');
+    opt.value = 'fil_blessica';
+    opt.textContent = 'Blessica (Filipino)';
+    filGroup.appendChild(opt);
+    seenKeys.add('fil_blessica');
+  }
+  if (!seenKeys.has('fil_angelo')) {
+    const opt = document.createElement('option');
+    opt.value = 'fil_angelo';
+    opt.textContent = 'Angelo (Filipino)';
+    filGroup.appendChild(opt);
+    seenKeys.add('fil_angelo');
+  }
+
+  if (selectedVal && Array.from(selectEl.options).some(o => o.value === selectedVal)) {
+    selectEl.value = selectedVal;
+  }
+}
+
+function applyFilipinoSpeechRules(text) {
+  if (!text || typeof text !== 'string') return text;
+
+  let processed = text;
+
+  // 1. Expand Filipino abbreviations and honorifics
+  processed = processed.replace(/\batbp\.?/gi, 'at iba pa');
+  processed = processed.replace(/\bG\.\s+/g, 'Ginoong ');
+  processed = processed.replace(/\bGng\.\s+/g, 'Ginang ');
+  processed = processed.replace(/\bBb\.\s+/g, 'Binibining ');
+  processed = processed.replace(/\bPang\.\s+/g, 'Pangulong ');
+  processed = processed.replace(/\bDr\.\s+/g, 'Doktor ');
+  processed = processed.replace(/\bDra\.\s+/g, 'Doktora ');
+  processed = processed.replace(/\bKgg\.\s+/g, 'Kagalang-galang na ');
+  processed = processed.replace(/\bBlg\.\s+/gi, 'Bilang ');
+  processed = processed.replace(/\bHal\.\s+/gi, 'Halimbawa ');
+  processed = processed.replace(/\bPah\.\s+/gi, 'Pahina ');
+  processed = processed.replace(/\bKap\.\s+/gi, 'Kabanata ');
+
+  // 2. Currency normalization for Philippine Peso
+  processed = processed.replace(/(?:₱|PHP\s*)\s*([\d,]+(?:\.\d+)?)/gi, (match, amount) => {
+    return `${amount} piso`;
+  });
+
+  // 3. Pronunciation aids for common symbols
+  processed = processed.replace(/(\s|^)&(\s|$)/g, '$1at$2');
+  processed = processed.replace(/(\d+)\s*%/g, '$1 porsyento');
+  processed = processed.replace(/#\s*(\d+)/g, 'numero $1');
+
+  return processed;
+}
+
+// -------------------------------------------------------------
+// Natural Neural Voice Matcher
+// -------------------------------------------------------------
+function getResolvedVoice(voices, voiceOrGender = 'female') {
   if (!voices || voices.length === 0) return null;
-  const isFemale = (gender || 'female').toLowerCase() === 'female';
+  const key = (voiceOrGender || 'female').toLowerCase();
+
+  // 1. Filipino Voice resolution
+  if (isFilipinoVoice(key)) {
+    const isMale = key === 'fil_angelo' || /\b(angelo|male|lalaki)\b/i.test(key);
+
+    if (isMale) {
+      const maleFilipinoPriority = [
+        v => /\bangelo\b/i.test(v.name) && (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)),
+        v => /\bangelo\b/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && /(male|\bman\b)/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && !/\b(blessica|female|woman)\b/i.test(v.name),
+        v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)
+      ];
+      for (const matcher of maleFilipinoPriority) {
+        const found = voices.find(matcher);
+        if (found) return found;
+      }
+    } else {
+      const femaleFilipinoPriority = [
+        v => /\bblessica\b/i.test(v.name) && (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)),
+        v => /\bblessica\b/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && /(female|woman)/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && !/\b(angelo|male|\bman\b)/i.test(v.name),
+        v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)
+      ];
+      for (const matcher of femaleFilipinoPriority) {
+        const found = voices.find(matcher);
+        if (found) return found;
+      }
+    }
+
+    const exact = voices.find(v => v.name.toLowerCase() === key || (v.voiceURI && v.voiceURI.toLowerCase() === key));
+    if (exact) return exact;
+
+    const anyFilipino = voices.find(v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name));
+    if (anyFilipino) return anyFilipino;
+  }
+
+  // 2. English / Standard Voice resolution (female / male)
+  const isFemale = key === 'female' || (!key.includes('male') && !key.includes('guy') && key !== 'fil_angelo');
 
   const femalePriority = [
     // 1. Aria neural natural (Edge / Windows / Azure)
@@ -166,7 +343,12 @@ function getVoicesAsync(maxWaitMs = 800) {
       voicesInitialized = true;
       cleanup();
       if (result && result.length > 0) cachedVoices = result;
-      resolve(cachedVoices.length > 0 ? cachedVoices : (window.speechSynthesis.getVoices() || []));
+      const finalVoices = cachedVoices.length > 0 ? cachedVoices : (window.speechSynthesis.getVoices() || []);
+      const voiceEl = document.getElementById('reader-tts-voice');
+      if (voiceEl && typeof currentReaderSettings !== 'undefined') {
+        populateFilipinoVoiceDropdown(voiceEl, finalVoices, currentReaderSettings.ttsVoice || 'female');
+      }
+      resolve(finalVoices);
     };
 
     const onVoices = () => {
@@ -209,6 +391,10 @@ if (typeof window !== 'undefined' && window.speechSynthesis) {
       cachedVoices = v;
       if (v.some(voice => /(natural|online|neural)/i.test(voice.name))) {
         voicesInitialized = true;
+      }
+      const voiceEl = document.getElementById('reader-tts-voice');
+      if (voiceEl && typeof currentReaderSettings !== 'undefined') {
+        populateFilipinoVoiceDropdown(voiceEl, cachedVoices, currentReaderSettings.ttsVoice || 'female');
       }
     }
   });
@@ -810,6 +996,9 @@ function initToolbarControls() {
 
   // TTS Voice selector & Kokoro Studio Modal
   const voiceSelect = document.getElementById('reader-tts-voice');
+  if (voiceSelect) {
+    populateFilipinoVoiceDropdown(voiceSelect, cachedVoices, currentReaderSettings.ttsVoice || 'female');
+  }
   previousReaderVoice = currentReaderSettings.ttsVoice || 'female';
   previousReaderTier = currentReaderSettings.ttsEngineTier || 'wasm';
 
@@ -1721,7 +1910,10 @@ function updateToolbarUI() {
   if (rulerEl) rulerEl.checked = Boolean(currentReaderSettings.ruler);
 
   const voiceEl = document.getElementById('reader-tts-voice');
-  if (voiceEl) voiceEl.value = currentReaderSettings.ttsVoice || 'female';
+  if (voiceEl) {
+    populateFilipinoVoiceDropdown(voiceEl, cachedVoices, currentReaderSettings.ttsVoice || 'female');
+    voiceEl.value = currentReaderSettings.ttsVoice || 'female';
+  }
 
   const speedEl = document.getElementById('reader-tts-speed');
   if (speedEl) speedEl.value = (currentReaderSettings.ttsSpeed || 1.0).toString();
@@ -2548,15 +2740,18 @@ async function playNextReaderTtsChunk() {
     return;
   }
 
-  ttsUtterance = new SpeechSynthesisUtterance(chunk);
+  const isFil = isFilipinoVoice(activeVoice);
+  const chunkText = isFil ? applyFilipinoSpeechRules(chunk) : chunk;
+
+  ttsUtterance = new SpeechSynthesisUtterance(chunkText);
   ttsUtterance.rate = speedVal;
 
   const preferredVoice = getResolvedVoice(voices, activeVoice);
   if (preferredVoice) {
     ttsUtterance.voice = preferredVoice;
-    ttsUtterance.lang = preferredVoice.lang || 'en-US';
+    ttsUtterance.lang = isFil ? (preferredVoice.lang || 'fil-PH') : (preferredVoice.lang || 'en-US');
   } else {
-    ttsUtterance.lang = navigator.language || 'en-US';
+    ttsUtterance.lang = isFil ? 'fil-PH' : (navigator.language || 'en-US');
   }
 
   activeReaderUtterances.add(ttsUtterance);
@@ -2848,14 +3043,17 @@ async function openDictionaryModal(word) {
         activeReaderUtterances.clear();
         updateReaderTtsUi(false);
         setTimeout(() => {
-          const u = new SpeechSynthesisUtterance(entry.word);
+          const isFil = isFilipinoVoice(activeVoice);
+          const speakWord = isFil ? applyFilipinoSpeechRules(entry.word) : entry.word;
+          const u = new SpeechSynthesisUtterance(speakWord);
           u.rate = speedVal;
-          u.lang = navigator.language || 'en-US';
+          u.lang = isFil ? 'fil-PH' : (navigator.language || 'en-US');
           const voices = window.speechSynthesis.getVoices();
           const preferredVoice = getResolvedVoice(voices, activeVoice);
           if (preferredVoice) {
             u.voice = preferredVoice;
             if (preferredVoice.lang) u.lang = preferredVoice.lang;
+            else if (isFil) u.lang = 'fil-PH';
           }
           activeReaderUtterances.add(u);
           u.onend = () => activeReaderUtterances.delete(u);

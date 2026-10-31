@@ -79,11 +79,95 @@ let currentSettings = {
 };
 
 // -------------------------------------------------------------
-// Natural Neural Voice Matcher (Aria for Female, Guy for Male)
+// Voice Recognition & Filipino Language Helpers
 // -------------------------------------------------------------
-function getResolvedVoice(voices, gender = 'female') {
+function isFilipinoVoice(voiceId) {
+  if (!voiceId) return false;
+  const id = String(voiceId).toLowerCase();
+  if (id === 'fil_blessica' || id === 'fil_angelo' || id.startsWith('fil_')) return true;
+  if (id.startsWith('fil-') || id.startsWith('tl-') || id === 'fil' || id === 'tl') return true;
+  if (id.includes('filipino') || id.includes('tagalog') || id.includes('blessica') || id.includes('angelo')) return true;
+  return false;
+}
+
+function applyFilipinoSpeechRules(text) {
+  if (!text || typeof text !== 'string') return text;
+
+  let processed = text;
+
+  // 1. Expand Filipino abbreviations and honorifics
+  processed = processed.replace(/\batbp\.?/gi, 'at iba pa');
+  processed = processed.replace(/\bG\.\s+/g, 'Ginoong ');
+  processed = processed.replace(/\bGng\.\s+/g, 'Ginang ');
+  processed = processed.replace(/\bBb\.\s+/g, 'Binibining ');
+  processed = processed.replace(/\bPang\.\s+/g, 'Pangulong ');
+  processed = processed.replace(/\bDr\.\s+/g, 'Doktor ');
+  processed = processed.replace(/\bDra\.\s+/g, 'Doktora ');
+  processed = processed.replace(/\bKgg\.\s+/g, 'Kagalang-galang na ');
+  processed = processed.replace(/\bBlg\.\s+/gi, 'Bilang ');
+  processed = processed.replace(/\bHal\.\s+/gi, 'Halimbawa ');
+  processed = processed.replace(/\bPah\.\s+/gi, 'Pahina ');
+  processed = processed.replace(/\bKap\.\s+/gi, 'Kabanata ');
+
+  // 2. Currency normalization for Philippine Peso
+  processed = processed.replace(/(?:₱|PHP\s*)\s*([\d,]+(?:\.\d+)?)/gi, (match, amount) => {
+    return `${amount} piso`;
+  });
+
+  // 3. Pronunciation aids for common symbols
+  processed = processed.replace(/(\s|^)&(\s|$)/g, '$1at$2');
+  processed = processed.replace(/(\d+)\s*%/g, '$1 porsyento');
+  processed = processed.replace(/#\s*(\d+)/g, 'numero $1');
+
+  return processed;
+}
+
+// -------------------------------------------------------------
+// Natural Neural Voice Matcher
+// -------------------------------------------------------------
+function getResolvedVoice(voices, voiceOrGender = 'female') {
   if (!voices || voices.length === 0) return null;
-  const isFemale = (gender || 'female').toLowerCase() === 'female';
+  const key = (voiceOrGender || 'female').toLowerCase();
+
+  // 1. Filipino Voice resolution
+  if (isFilipinoVoice(key)) {
+    const isMale = key === 'fil_angelo' || /\b(angelo|male|lalaki)\b/i.test(key);
+
+    if (isMale) {
+      const maleFilipinoPriority = [
+        v => /\bangelo\b/i.test(v.name) && (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)),
+        v => /\bangelo\b/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && /(male|\bman\b)/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && !/\b(blessica|female|woman)\b/i.test(v.name),
+        v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)
+      ];
+      for (const matcher of maleFilipinoPriority) {
+        const found = voices.find(matcher);
+        if (found) return found;
+      }
+    } else {
+      const femaleFilipinoPriority = [
+        v => /\bblessica\b/i.test(v.name) && (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)),
+        v => /\bblessica\b/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && /(female|woman)/i.test(v.name),
+        v => (v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl')) && !/\b(angelo|male|\bman\b)/i.test(v.name),
+        v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name)
+      ];
+      for (const matcher of femaleFilipinoPriority) {
+        const found = voices.find(matcher);
+        if (found) return found;
+      }
+    }
+
+    const exact = voices.find(v => v.name.toLowerCase() === key || (v.voiceURI && v.voiceURI.toLowerCase() === key));
+    if (exact) return exact;
+
+    const anyFilipino = voices.find(v => v.lang.toLowerCase().startsWith('fil') || v.lang.toLowerCase().startsWith('tl') || /filipino|tagalog/i.test(v.name));
+    if (anyFilipino) return anyFilipino;
+  }
+
+  // 2. English / Standard Voice resolution (female / male)
+  const isFemale = key === 'female' || (!key.includes('male') && !key.includes('guy') && key !== 'fil_angelo');
 
   const femalePriority = [
     // 1. Aria neural natural (Edge / Windows / Azure)
@@ -1409,15 +1493,19 @@ async function playNextTtsChunk() {
     return;
   }
 
-  currentUtterance = new SpeechSynthesisUtterance(chunk);
+  const activeVoice = currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female';
+  const isFil = isFilipinoVoice(activeVoice);
+  const chunkText = isFil ? applyFilipinoSpeechRules(chunk) : chunk;
+
+  currentUtterance = new SpeechSynthesisUtterance(chunkText);
   currentUtterance.rate = parseFloat(currentSettings.ttsSpeed || currentSettings.ttsRate || 1.0);
 
-  const preferredVoice = getResolvedVoice(voices, currentSettings.ttsVoice || currentSettings.ttsVoiceGender || 'female');
+  const preferredVoice = getResolvedVoice(voices, activeVoice);
   if (preferredVoice) {
     currentUtterance.voice = preferredVoice;
-    currentUtterance.lang = preferredVoice.lang || 'en-US';
+    currentUtterance.lang = isFil ? (preferredVoice.lang || 'fil-PH') : (preferredVoice.lang || 'en-US');
   } else {
-    currentUtterance.lang = navigator.language || 'en-US';
+    currentUtterance.lang = isFil ? 'fil-PH' : (navigator.language || 'en-US');
   }
 
   currentUtterance.onend = () => {
@@ -1706,14 +1794,16 @@ async function openInPageDictionary(word, x, y) {
         if (window.speechSynthesis) {
           window.speechSynthesis.cancel();
           const voices = await getVoicesAsync();
-          const u = new SpeechSynthesisUtterance(entry.word);
+          const isFil = isFilipinoVoice(voice);
+          const speakWord = isFil ? applyFilipinoSpeechRules(entry.word) : entry.word;
+          const u = new SpeechSynthesisUtterance(speakWord);
           u.rate = speed;
           const preferredVoice = getResolvedVoice(voices, voice);
           if (preferredVoice) {
             u.voice = preferredVoice;
-            u.lang = preferredVoice.lang || 'en-US';
+            u.lang = isFil ? (preferredVoice.lang || 'fil-PH') : (preferredVoice.lang || 'en-US');
           } else {
-            u.lang = 'en-US';
+            u.lang = isFil ? 'fil-PH' : 'en-US';
           }
           window.speechSynthesis.speak(u);
         }
