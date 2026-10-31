@@ -311,11 +311,28 @@ async function loadKokoroModel(progressCallback, tier = 'wasm') {
         let adapter = null;
         if (typeof navigator !== 'undefined' && navigator.gpu) {
           try {
-            adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-            if (adapter && env?.backends?.onnx) {
+            if (env?.backends?.onnx) {
               if (!env.backends.onnx.webgpu) env.backends.onnx.webgpu = {};
-              env.backends.onnx.webgpu.adapter = adapter;
-              env.backends.onnx.webgpu.powerPreference = 'high-performance';
+              try {
+                env.backends.onnx.webgpu.powerPreference = 'high-performance';
+              } catch (_) {}
+
+              const existingAdapter = env.backends.onnx.webgpu.adapter;
+              if (existingAdapter && typeof existingAdapter.requestDevice === 'function') {
+                adapter = existingAdapter;
+              }
+            }
+
+            if (!adapter) {
+              adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+              if (adapter && env?.backends?.onnx?.webgpu) {
+                try {
+                  const desc = Object.getOwnPropertyDescriptor(env.backends.onnx.webgpu, 'adapter');
+                  if (!desc || desc.writable) {
+                    env.backends.onnx.webgpu.adapter = adapter;
+                  }
+                } catch (_) {}
+              }
             }
           } catch (adapterErr) {
             console.warn('Failed to query high-performance GPU adapter:', adapterErr);
@@ -335,8 +352,19 @@ async function loadKokoroModel(progressCallback, tier = 'wasm') {
           if (!globalThis.ort) globalThis.ort = {};
           if (!globalThis.ort.env) globalThis.ort.env = {};
           if (!globalThis.ort.env.webgpu) globalThis.ort.env.webgpu = {};
-          globalThis.ort.env.webgpu.device = activeDevice;
-          if (adapter) globalThis.ort.env.webgpu.adapter = adapter;
+          try {
+            const devDesc = Object.getOwnPropertyDescriptor(globalThis.ort.env.webgpu, 'device');
+            if (!devDesc || devDesc.writable) {
+              globalThis.ort.env.webgpu.device = activeDevice;
+            }
+          } catch (_) {}
+
+          try {
+            const adDesc = Object.getOwnPropertyDescriptor(globalThis.ort.env.webgpu, 'adapter');
+            if (adapter && (!adDesc || adDesc.writable)) {
+              globalThis.ort.env.webgpu.adapter = adapter;
+            }
+          } catch (_) {}
 
           activeDevice.lost.then(async (info) => {
             console.warn('Main thread WebGPU device lost (driver reset/TDR):', info.message, 'Reason:', info.reason);
