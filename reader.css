@@ -1286,15 +1286,6 @@ body.contrast-inverted .page-header-tag {
 
 /* Base Print Styles */
 @media print {
-  :root {
-    --reader-bg: #ffffff !important;
-    --reader-surface: #ffffff !important;
-    --reader-text: #000000 !important;
-    --reader-border: #cccccc !important;
-    --va-bg-color: #ffffff !important;
-    --va-text-color: #000000 !important;
-  }
-
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -1340,7 +1331,7 @@ body.contrast-inverted .page-header-tag {
     visibility: hidden !important;
   }
 
-  /* 1. Reset Theme on Print: clean background & deep black text across all containers & text */
+  /* 1. Irlen Contrast & Theme on Print across canvas, containers & text */
   html,
   body,
   body.va-reader-body,
@@ -1348,10 +1339,10 @@ body.contrast-inverted .page-header-tag {
   .page-container,
   .reader-layout,
   .reader-container {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -1363,14 +1354,16 @@ body.contrast-inverted .page-header-tag {
     overflow: visible !important;
     position: static !important;
     font-family: var(--font-family, system-ui, sans-serif) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .reader-document {
     display: block !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
@@ -1385,15 +1378,19 @@ body.contrast-inverted .page-header-tag {
     overflow: visible !important;
     position: static !important;
     font-family: var(--font-family, system-ui, sans-serif) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .reader-document * {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     background: transparent !important;
     background-color: transparent !important;
     box-shadow: none !important;
     text-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
@@ -1401,10 +1398,10 @@ body.contrast-inverted .page-header-tag {
   section,
   article {
     display: block !important;
-    background: transparent !important;
-    background-color: transparent !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    background: var(--reader-surface, #ffffff) !important;
+    background-color: var(--reader-surface, #ffffff) !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
@@ -1422,6 +1419,8 @@ body.contrast-inverted .page-header-tag {
     page-break-inside: auto !important;
     break-after: page !important;
     page-break-after: always !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .reader-page:last-child {
@@ -1433,11 +1432,12 @@ body.contrast-inverted .page-header-tag {
 
   .page-header-tag {
     display: block !important;
-    color: #555555 !important;
-    -webkit-text-fill-color: #555555 !important;
+    color: var(--reader-text, #555555) !important;
+    -webkit-text-fill-color: var(--reader-text, #555555) !important;
+    opacity: 0.75 !important;
     background: transparent !important;
     font-size: 0.75rem !important;
-    border-bottom: 1px solid #cccccc !important;
+    border-bottom: 1px solid var(--reader-border, #cccccc) !important;
     margin-bottom: 16px !important;
     padding-bottom: 4px !important;
     font-family: system-ui, -apple-system, sans-serif !important;
@@ -1454,8 +1454,8 @@ body.contrast-inverted .page-header-tag {
   li,
   ul,
   ol {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     background: transparent !important;
     line-height: var(--leading, 1.6) !important;
     letter-spacing: var(--tracking, 0px) !important;
@@ -1483,8 +1483,8 @@ body.contrast-inverted .page-header-tag {
   .reader-document h4,
   .reader-document h5,
   .reader-document h6 {
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     background: transparent !important;
     height: auto !important;
     max-height: none !important;
@@ -1499,10 +1499,11 @@ body.contrast-inverted .page-header-tag {
 
   .va-bionic-fix {
     font-weight: 700 !important;
-    color: #000000 !important;
-    -webkit-text-fill-color: #000000 !important;
+    color: var(--reader-text, #000000) !important;
+    -webkit-text-fill-color: var(--reader-text, #000000) !important;
     background: transparent !important;
   }
+}
 }
 
 /* Mobile & Tablet Responsiveness */
