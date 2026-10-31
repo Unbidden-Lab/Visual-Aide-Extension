@@ -52,11 +52,11 @@ body.va-reader-body {
   padding: 0;
   background-color: var(--reader-bg);
   color: var(--reader-text);
-  font-family: var(--font-family);
-  font-size: var(--font-size);
-  letter-spacing: var(--tracking);
-  word-spacing: var(--spacing);
-  line-height: var(--leading);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  letter-spacing: normal;
+  word-spacing: normal;
+  line-height: 1.4;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -261,9 +261,29 @@ body.va-reader-body {
   z-index: 95;
   box-sizing: border-box;
   flex-shrink: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 0.85rem !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  line-height: 1.4 !important;
   transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
               transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.22s ease;
+}
+
+.reader-sidebar * {
+  letter-spacing: normal;
+  word-spacing: normal;
+  line-height: normal;
+}
+.reader-sidebar .sidebar-section-title {
+  letter-spacing: 0.8px !important;
+  line-height: 1.2 !important;
+}
+.reader-sidebar label,
+.reader-sidebar .tool-label-row label {
+  letter-spacing: 0.5px !important;
+  line-height: 1.2 !important;
 }
 
 .reader-sidebar.collapsed {
@@ -381,6 +401,24 @@ body.va-reader-body {
   box-sizing: border-box;
 }
 
+.sidebar-item .btn-group,
+.font-size-btn-group {
+  display: inline-flex;
+  align-self: flex-start;
+  width: auto;
+  gap: 2px;
+}
+.sidebar-item .btn-group .tool-btn {
+  padding: 4px 10px;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+.sidebar-item .btn-group .tool-badge {
+  padding: 0 8px;
+  min-width: 42px;
+  text-align: center;
+}
+
 .sidebar-toggles {
   display: flex;
   flex-direction: column;
@@ -491,22 +529,34 @@ input[type=range] {
   border: 1px solid #444;
   border-radius: 5px;
   overflow: hidden;
+  width: 100%;
 }
 .dict-search-box input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
   background: transparent;
   border: none;
-  padding: 5px 8px;
+  padding: 6px 10px;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   outline: none;
-  width: 120px;
 }
 .dict-search-box button {
   background: #333;
   border: none;
+  border-left: 1px solid #444;
   color: #fff;
-  padding: 5px 8px;
+  padding: 6px 14px;
   cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dict-search-box button:hover {
+  background: #444;
+  color: var(--accent);
 }
 
 /* Reader Main Container */
