@@ -560,12 +560,18 @@ function initNetworkStatus() {
   const offlineCloseBtn = document.getElementById('reader-offline-close-btn');
   const offlineBackdrop = document.getElementById('reader-offline-backdrop');
 
+  let offlineNoticeDismissed = false;
+  let lastReportedOnlineState = null;
+
   function showOfflineNotice() {
     if (offlineModal) offlineModal.classList.remove('hidden');
   }
 
-  function hideOfflineNotice() {
+  function hideOfflineNotice(userDismissed = false) {
     if (offlineModal) offlineModal.classList.add('hidden');
+    if (userDismissed) {
+      offlineNoticeDismissed = true;
+    }
   }
 
   if (offlineSwitchBtn) {
@@ -574,14 +580,18 @@ function initNetworkStatus() {
       if (voiceSelect) voiceSelect.value = 'af_heart';
       updateReaderNeuralTierVisibility('af_heart');
       saveReaderSettings();
+      offlineNoticeDismissed = true;
       hideOfflineNotice();
     });
   }
-  if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', hideOfflineNotice);
-  if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', hideOfflineNotice);
-  if (offlineBackdrop) offlineBackdrop.addEventListener('click', hideOfflineNotice);
+  if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', () => hideOfflineNotice(true));
+  if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', () => hideOfflineNotice(true));
+  if (offlineBackdrop) offlineBackdrop.addEventListener('click', () => hideOfflineNotice(true));
 
   function updateNetworkUI(online) {
+    const stateChanged = (lastReportedOnlineState !== online);
+    lastReportedOnlineState = online;
+
     if (badge && text) {
       if (online) {
         badge.className = 'status-badge online';
@@ -598,10 +608,11 @@ function initNetworkStatus() {
       updateVoiceSelectorOnlineStatus(voiceSelect, online);
     }
 
-    if (!online && voiceSelect && !isKokoroVoice(currentReaderSettings.ttsVoice)) {
-      showOfflineNotice();
-    } else if (online) {
+    if (online) {
+      offlineNoticeDismissed = false;
       hideOfflineNotice();
+    } else if (stateChanged && !offlineNoticeDismissed && voiceSelect && !isKokoroVoice(currentReaderSettings.ttsVoice)) {
+      showOfflineNotice();
     }
   }
 
@@ -1321,8 +1332,6 @@ function initToolbarControls() {
   if (voiceSelect) {
     voiceSelect.addEventListener('click', () => {
       if (!isDeviceOnline) {
-        const offlineModal = document.getElementById('reader-offline-voice-modal');
-        if (offlineModal) offlineModal.classList.remove('hidden');
         checkInternetConnectivity(true);
       }
     });

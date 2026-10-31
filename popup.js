@@ -1129,8 +1129,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (ttsVoiceSelect) {
     ttsVoiceSelect.addEventListener('click', () => {
       if (!isDeviceOnline) {
-        const offlineBanner = document.getElementById('offline-voice-banner');
-        if (offlineBanner) offlineBanner.classList.remove('hidden');
         checkInternetConnectivity(true);
       }
     });
@@ -1759,32 +1757,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const offlineDismissBtn = document.getElementById('offline-voice-dismiss-btn');
     const offlineCloseBtn = document.getElementById('offline-voice-close-btn');
 
+    let offlineNoticeDismissed = false;
+    let lastReportedOnlineState = null;
+
     function showOfflineNotice() {
       if (offlineBanner) offlineBanner.classList.remove('hidden');
     }
 
-    function hideOfflineNotice() {
+    function hideOfflineNotice(userDismissed = false) {
       if (offlineBanner) offlineBanner.classList.add('hidden');
+      if (userDismissed) {
+        offlineNoticeDismissed = true;
+      }
     }
 
     if (offlineSwitchBtn) {
       offlineSwitchBtn.addEventListener('click', () => {
         applyVoiceSetting('af_heart');
+        offlineNoticeDismissed = true;
         hideOfflineNotice();
       });
     }
-    if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', hideOfflineNotice);
-    if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', hideOfflineNotice);
+    if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', () => hideOfflineNotice(true));
+    if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', () => hideOfflineNotice(true));
 
     function updateNetworkUI(online) {
+      const stateChanged = (lastReportedOnlineState !== online);
+      lastReportedOnlineState = online;
+
       if (voiceSelect) {
         updateVoiceSelectorOnlineStatus(voiceSelect, online);
       }
       const currentVoice = currentSettings.ttsVoice || 'female';
-      if (!online && !isKokoroVoice(currentVoice)) {
-        showOfflineNotice();
-      } else if (online) {
+      if (online) {
+        offlineNoticeDismissed = false;
         hideOfflineNotice();
+      } else if (stateChanged && !offlineNoticeDismissed && !isKokoroVoice(currentVoice)) {
+        showOfflineNotice();
       }
     }
 
