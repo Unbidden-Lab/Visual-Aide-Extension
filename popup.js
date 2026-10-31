@@ -28,6 +28,104 @@ const DEFAULT_SETTINGS = {
 };
 
 // -------------------------------------------------------------
+// Active Internet Connectivity Verification
+// Accurately tests true WAN reachability via zero-overhead probe
+// (Fixes navigator.onLine reporting true on disconnected LANs)
+// -------------------------------------------------------------
+let isDeviceOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+let lastConnectivityCheckTime = 0;
+let isCheckingConnectivity = false;
+
+async function checkInternetConnectivity(force = false) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    isDeviceOnline = false;
+    if (typeof window !== 'undefined') window.vaIsOnline = false;
+    return false;
+  }
+
+  const now = Date.now();
+  if (!force && (now - lastConnectivityCheckTime < 2000)) {
+    return isDeviceOnline;
+  }
+  if (isCheckingConnectivity) {
+    return isDeviceOnline;
+  }
+
+  isCheckingConnectivity = true;
+  lastConnectivityCheckTime = now;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+
+  try {
+    await fetch(`https://connectivitycheck.gstatic.com/generate_204?_t=${now}`, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    isDeviceOnline = true;
+  } catch (err) {
+    clearTimeout(timer);
+    try {
+      const fbController = new AbortController();
+      const fbTimer = setTimeout(() => fbController.abort(), 1500);
+      await fetch(`https://www.google.com/generate_204?_t=${now}`, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: fbController.signal
+      });
+      clearTimeout(fbTimer);
+      isDeviceOnline = true;
+    } catch (fbErr) {
+      isDeviceOnline = false;
+    }
+  } finally {
+    isCheckingConnectivity = false;
+    if (typeof window !== 'undefined') window.vaIsOnline = isDeviceOnline;
+  }
+
+  return isDeviceOnline;
+}
+
+function updateVoiceSelectorOnlineStatus(selectEl, isOnline) {
+  if (!selectEl) return;
+
+  const englishGroup = selectEl.querySelector('#voice-group-standard-english') ||
+    selectEl.querySelector('#reader-voice-group-standard-english') ||
+    selectEl.querySelector('optgroup[label*="English"]');
+  const filipinoGroup = selectEl.querySelector('#voice-group-standard-filipino') ||
+    selectEl.querySelector('#reader-voice-group-standard-filipino') ||
+    selectEl.querySelector('optgroup[label*="Filipino"]');
+
+  const standardGroups = [englishGroup, filipinoGroup].filter(Boolean);
+
+  standardGroups.forEach(group => {
+    group.disabled = !isOnline;
+    Array.from(group.querySelectorAll('option')).forEach(opt => {
+      opt.disabled = !isOnline;
+      const baseLabel = opt.getAttribute('data-base-label') || opt.textContent.replace(/\s*\(Requires Internet\)/gi, '').trim();
+      opt.setAttribute('data-base-label', baseLabel);
+      if (!isOnline) {
+        opt.textContent = `${baseLabel} (Requires Internet)`;
+      } else {
+        opt.textContent = baseLabel;
+      }
+    });
+  });
+
+  const kokoroGroup = selectEl.querySelector('optgroup[label*="Kokoro"]');
+  if (kokoroGroup) {
+    kokoroGroup.disabled = false;
+    Array.from(kokoroGroup.querySelectorAll('option')).forEach(opt => {
+      opt.disabled = false;
+    });
+  }
+}
+
+// -------------------------------------------------------------
 // Voice Recognition & Filipino Language Helpers
 // -------------------------------------------------------------
 function isFilipinoVoice(voiceId) {
@@ -129,6 +227,7 @@ function populateFilipinoVoiceDropdown(selectEl, voices, currentVoiceId) {
   if (selectedVal && Array.from(selectEl.options).some(o => o.value === selectedVal)) {
     selectEl.value = selectedVal;
   }
+  updateVoiceSelectorOnlineStatus(selectEl, isDeviceOnline);
 }
 
 function applyFilipinoSpeechRules(text) {
@@ -1028,8 +1127,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // TTS Voice Selector & Sync Storage
   if (ttsVoiceSelect) {
+    ttsVoiceSelect.addEventListener('click', () => {
+      if (!isDeviceOnline) {
+        const offlineBanner = document.getElementById('offline-voice-banner');
+        if (offlineBanner) offlineBanner.classList.remove('hidden');
+        checkInternetConnectivity(true);
+      }
+    });
+
     ttsVoiceSelect.addEventListener('change', async (e) => {
       const chosen = e.target.value;
+
+      if (!isDeviceOnline && !isKokoroVoice(chosen)) {
+        const offlineBanner = document.getElementById('offline-voice-banner');
+        if (offlineBanner) offlineBanner.classList.remove('hidden');
+        const fallback = isKokoroVoice(previousVoice) ? previousVoice : 'af_heart';
+        ttsVoiceSelect.value = fallback;
+        applyVoiceSetting(fallback);
+        return;
+      }
+
       updateNeuralTierVisibility(chosen);
 
       if (isKokoroVoice(chosen)) {
@@ -1200,6 +1317,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 2. Standard Web SpeechSynthesis voice active
+      if (!isDeviceOnline) {
+        const offlineBanner = document.getElementById('offline-voice-banner');
+        if (offlineBanner) offlineBanner.classList.remove('hidden');
+        return;
+      }
       if (!window.speechSynthesis) return;
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -1626,6 +1748,68 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   initPopupTooltips();
+
+  // -----------------------------------------------------------
+  // Network Status & Voice Accessibility in Popup
+  // -----------------------------------------------------------
+  function initPopupNetworkStatus() {
+    const voiceSelect = document.getElementById('tts-voice');
+    const offlineBanner = document.getElementById('offline-voice-banner');
+    const offlineSwitchBtn = document.getElementById('offline-voice-switch-btn');
+    const offlineDismissBtn = document.getElementById('offline-voice-dismiss-btn');
+    const offlineCloseBtn = document.getElementById('offline-voice-close-btn');
+
+    function showOfflineNotice() {
+      if (offlineBanner) offlineBanner.classList.remove('hidden');
+    }
+
+    function hideOfflineNotice() {
+      if (offlineBanner) offlineBanner.classList.add('hidden');
+    }
+
+    if (offlineSwitchBtn) {
+      offlineSwitchBtn.addEventListener('click', () => {
+        applyVoiceSetting('af_heart');
+        hideOfflineNotice();
+      });
+    }
+    if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', hideOfflineNotice);
+    if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', hideOfflineNotice);
+
+    function updateNetworkUI(online) {
+      if (voiceSelect) {
+        updateVoiceSelectorOnlineStatus(voiceSelect, online);
+      }
+      const currentVoice = currentSettings.ttsVoice || 'female';
+      if (!online && !isKokoroVoice(currentVoice)) {
+        showOfflineNotice();
+      } else if (online) {
+        hideOfflineNotice();
+      }
+    }
+
+    async function refreshConnectivity(force = false) {
+      const online = await checkInternetConnectivity(force);
+      updateNetworkUI(online);
+      return online;
+    }
+
+    window.addEventListener('online', () => refreshConnectivity(true));
+    window.addEventListener('offline', () => {
+      isDeviceOnline = false;
+      updateNetworkUI(false);
+    });
+    window.addEventListener('focus', () => refreshConnectivity(true));
+
+    setInterval(() => {
+      refreshConnectivity(false);
+    }, 5000);
+
+    updateNetworkUI(navigator.onLine);
+    refreshConnectivity(true);
+  }
+
+  initPopupNetworkStatus();
 
   // -----------------------------------------------------------
   // Simplified Dictionary in Extension Popup

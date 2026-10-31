@@ -2936,7 +2936,8 @@ async function lookupSimplifiedWord(inputWord) {
   }
 
   // 2. Query online services if connected
-  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false) &&
+    (typeof window === 'undefined' || window.vaIsOnline !== false);
   if (isOnline) {
     // Try Datamuse first (fastest and most reliable)
     for (const wordToTry of [clean, ...stems.slice(1, 3)]) {

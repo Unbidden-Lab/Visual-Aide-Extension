@@ -872,6 +872,100 @@ input[type=range] {
   border-color: #666666;
 }
 
+/* Offline Standard Voices Notice Banner in Popup */
+.offline-voice-banner {
+  background: #251c14;
+  border: 1px solid #ffaa00;
+  border-radius: var(--border-radius);
+  padding: 10px 12px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.offline-voice-banner.hidden {
+  display: none;
+}
+
+.offline-voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.offline-voice-title {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffaa00;
+}
+
+.offline-voice-close {
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.offline-voice-close:hover {
+  color: #ffffff;
+}
+
+.offline-voice-desc {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #cccccc;
+  margin: 0 0 10px 0;
+}
+
+.offline-voice-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.offline-voice-btn-primary {
+  background: #ffaa00;
+  color: #000000;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.offline-voice-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.offline-voice-btn-secondary {
+  background: transparent;
+  color: #888888;
+  border: 1px solid #444444;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.offline-voice-btn-secondary:hover {
+  color: #ffffff;
+  border-color: #666666;
+}
+
+select option:disabled,
+select optgroup:disabled {
+  color: #777777 !important;
+  background-color: #1e1e1e !important;
+}
+
 /* Neural Engine Tier Disabled / Greyed out state when Kokoro AI is not selected */
 .tier-disabled {
   opacity: 0.38;

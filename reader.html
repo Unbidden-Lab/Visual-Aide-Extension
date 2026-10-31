@@ -400,6 +400,22 @@
     </div>
   </div>
 
+  <!-- Offline Standard Voices Modal Notice in Reader -->
+  <div id="reader-offline-voice-modal" class="reader-offline-modal hidden" role="dialog" aria-modal="true" aria-labelledby="reader-offline-title">
+    <div class="reader-offline-backdrop" id="reader-offline-backdrop"></div>
+    <div class="reader-offline-card">
+      <div class="reader-offline-header">
+        <h3 id="reader-offline-title" class="reader-offline-title">Internet Connection Required</h3>
+        <button type="button" id="reader-offline-close-btn" class="reader-offline-close" aria-label="Close notice">&times;</button>
+      </div>
+      <p class="reader-offline-desc">Standard voices (Aria, Guy, Blessica, Angelo) require an active internet connection. Connect to the internet, or switch to Kokoro Studio HD (Offline AI) to read aloud offline.</p>
+      <div class="reader-offline-actions">
+        <button type="button" id="reader-offline-switch-btn" class="tool-btn highlight">Switch to Kokoro Voice</button>
+        <button type="button" id="reader-offline-dismiss-btn" class="tool-btn">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
   <!-- External & Local Scripts -->
   <script src="lib/pdf.min.js"></script>
   <script src="lib/pdf.worker.min.js"></script>

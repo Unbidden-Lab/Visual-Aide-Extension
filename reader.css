@@ -1311,6 +1311,7 @@ body.contrast-inverted .page-header-tag {
   .dict-modal,
   .reader-tooltip,
   .reader-kokoro-modal,
+  .reader-offline-modal,
   .reader-loading-overlay,
   .upload-hero,
   .reader-pagination-bar,
@@ -1324,6 +1325,7 @@ body.contrast-inverted .page-header-tag {
   #reader-ruler,
   #reader-tooltip,
   #reader-kokoro-modal,
+  #reader-offline-voice-modal,
   #upload-hero,
   #print-btn,
   #upload-nav-btn {
@@ -1907,4 +1909,85 @@ body.contrast-inverted .reader-tooltip-desc {
 
 .tool-item.tier-disabled select {
   cursor: not-allowed;
+}
+
+/* Offline Standard Voices Modal in Reader */
+.reader-offline-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reader-offline-modal.hidden {
+  display: none;
+}
+
+.reader-offline-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+}
+
+.reader-offline-card {
+  position: relative;
+  background: #1a1a1a;
+  border: 1px solid #ffaa00;
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 90%;
+  max-width: 440px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  z-index: 1;
+}
+
+.reader-offline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.reader-offline-title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #ffaa00;
+  font-weight: 700;
+}
+
+.reader-offline-close {
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.reader-offline-close:hover {
+  color: #ffffff;
+}
+
+.reader-offline-desc {
+  margin: 0 0 14px 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #dddddd;
+}
+
+.reader-offline-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+select option:disabled,
+select optgroup:disabled {
+  color: #777777 !important;
+  background-color: #1e1e1e !important;
 }

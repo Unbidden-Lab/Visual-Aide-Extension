@@ -326,6 +326,21 @@
             </optgroup>
           </select>
 
+          <!-- Offline Standard Voices Notice Banner in Main Extension Menu -->
+          <div id="offline-voice-banner" class="offline-voice-banner hidden" role="alert" aria-live="assertive">
+            <div class="offline-voice-content">
+              <div class="offline-voice-header">
+                <span class="offline-voice-title">Internet Connection Required</span>
+                <button type="button" id="offline-voice-close-btn" class="offline-voice-close" aria-label="Close notice">&times;</button>
+              </div>
+              <p class="offline-voice-desc">Standard voices (Aria, Guy, Blessica, Angelo) require an active internet connection. Connect to the internet or switch to Kokoro Studio HD for offline reading.</p>
+              <div class="offline-voice-actions">
+                <button type="button" id="offline-voice-switch-btn" class="offline-voice-btn-primary">Switch to Kokoro Voice</button>
+                <button type="button" id="offline-voice-dismiss-btn" class="offline-voice-btn-secondary">Dismiss</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Kokoro Studio Model Download / Confirmation Banner -->
           <div id="kokoro-confirm-banner" class="kokoro-banner hidden" role="region" aria-live="polite">
             <div class="kokoro-banner-content">

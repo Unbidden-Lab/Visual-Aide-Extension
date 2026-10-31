@@ -71,6 +71,103 @@ let previousReaderVoice = 'female';
 let previousReaderTier = 'wasm';
 
 // -------------------------------------------------------------
+// Active Internet Connectivity Verification
+// Accurately tests true WAN reachability via zero-overhead probe
+// (Fixes navigator.onLine reporting true on disconnected LANs)
+// -------------------------------------------------------------
+let isDeviceOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+let lastConnectivityCheckTime = 0;
+let isCheckingConnectivity = false;
+
+async function checkInternetConnectivity(force = false) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    isDeviceOnline = false;
+    if (typeof window !== 'undefined') window.vaIsOnline = false;
+    return false;
+  }
+
+  const now = Date.now();
+  if (!force && (now - lastConnectivityCheckTime < 2000)) {
+    return isDeviceOnline;
+  }
+  if (isCheckingConnectivity) {
+    return isDeviceOnline;
+  }
+
+  isCheckingConnectivity = true;
+  lastConnectivityCheckTime = now;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+
+  try {
+    await fetch(`https://connectivitycheck.gstatic.com/generate_204?_t=${now}`, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    isDeviceOnline = true;
+  } catch (err) {
+    clearTimeout(timer);
+    try {
+      const fbController = new AbortController();
+      const fbTimer = setTimeout(() => fbController.abort(), 1500);
+      await fetch(`https://www.google.com/generate_204?_t=${now}`, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: fbController.signal
+      });
+      clearTimeout(fbTimer);
+      isDeviceOnline = true;
+    } catch (fbErr) {
+      isDeviceOnline = false;
+    }
+  } finally {
+    isCheckingConnectivity = false;
+    if (typeof window !== 'undefined') window.vaIsOnline = isDeviceOnline;
+  }
+
+  return isDeviceOnline;
+}
+
+function updateVoiceSelectorOnlineStatus(selectEl, isOnline) {
+  if (!selectEl) return;
+
+  const englishGroup = selectEl.querySelector('#reader-voice-group-standard-english') ||
+    selectEl.querySelector('#voice-group-standard-english') ||
+    selectEl.querySelector('optgroup[label*="English"]');
+  const filipinoGroup = selectEl.querySelector('#reader-voice-group-standard-filipino') ||
+    selectEl.querySelector('#voice-group-standard-filipino') ||
+    selectEl.querySelector('optgroup[label*="Filipino"]');
+
+  const standardGroups = [englishGroup, filipinoGroup].filter(Boolean);
+
+  standardGroups.forEach(group => {
+    group.disabled = !isOnline;
+    Array.from(group.querySelectorAll('option')).forEach(opt => {
+      opt.disabled = !isOnline;
+      const baseLabel = opt.getAttribute('data-base-label') || opt.textContent.replace(/\s*\(Requires Internet\)/gi, '').trim();
+      opt.setAttribute('data-base-label', baseLabel);
+      if (!isOnline) {
+        opt.textContent = `${baseLabel} (Requires Internet)`;
+      } else {
+        opt.textContent = baseLabel;
+      }
+    });
+  });
+
+  const kokoroGroup = selectEl.querySelector('optgroup[label*="Kokoro"]');
+  if (kokoroGroup) {
+    kokoroGroup.disabled = false;
+    Array.from(kokoroGroup.querySelectorAll('option')).forEach(opt => {
+      opt.disabled = false;
+    });
+  }
+}
+
 // -------------------------------------------------------------
 // Voice Recognition & Filipino Language Helpers
 // -------------------------------------------------------------
@@ -173,6 +270,7 @@ function populateFilipinoVoiceDropdown(selectEl, voices, currentVoiceId) {
   if (selectedVal && Array.from(selectEl.options).some(o => o.value === selectedVal)) {
     selectEl.value = selectedVal;
   }
+  updateVoiceSelectorOnlineStatus(selectEl, isDeviceOnline);
 }
 
 function applyFilipinoSpeechRules(text) {
@@ -450,27 +548,82 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // -------------------------------------------------------------
-// Network Status (Online / Offline Mode)
+// Network Status & Voice Accessibility (Online / Offline Mode)
 // -------------------------------------------------------------
 function initNetworkStatus() {
   const badge = document.getElementById('network-status');
   const text = document.getElementById('network-text');
+  const voiceSelect = document.getElementById('reader-tts-voice');
+  const offlineModal = document.getElementById('reader-offline-voice-modal');
+  const offlineSwitchBtn = document.getElementById('reader-offline-switch-btn');
+  const offlineDismissBtn = document.getElementById('reader-offline-dismiss-btn');
+  const offlineCloseBtn = document.getElementById('reader-offline-close-btn');
+  const offlineBackdrop = document.getElementById('reader-offline-backdrop');
 
-  function update() {
-    if (navigator.onLine) {
-      badge.className = 'status-badge online';
-      text.textContent = 'Online Mode';
-      badge.title = 'Online: Full web services & extended online dictionary active.';
-    } else {
-      badge.className = 'status-badge offline';
-      text.textContent = 'Offline Mode';
-      badge.title = 'Offline: Using local offline fonts, PDF parser & dictionary cache.';
+  function showOfflineNotice() {
+    if (offlineModal) offlineModal.classList.remove('hidden');
+  }
+
+  function hideOfflineNotice() {
+    if (offlineModal) offlineModal.classList.add('hidden');
+  }
+
+  if (offlineSwitchBtn) {
+    offlineSwitchBtn.addEventListener('click', () => {
+      currentReaderSettings.ttsVoice = 'af_heart';
+      if (voiceSelect) voiceSelect.value = 'af_heart';
+      updateReaderNeuralTierVisibility('af_heart');
+      saveReaderSettings();
+      hideOfflineNotice();
+    });
+  }
+  if (offlineDismissBtn) offlineDismissBtn.addEventListener('click', hideOfflineNotice);
+  if (offlineCloseBtn) offlineCloseBtn.addEventListener('click', hideOfflineNotice);
+  if (offlineBackdrop) offlineBackdrop.addEventListener('click', hideOfflineNotice);
+
+  function updateNetworkUI(online) {
+    if (badge && text) {
+      if (online) {
+        badge.className = 'status-badge online';
+        text.textContent = 'Online Mode';
+        badge.title = 'Online: Full web services & extended online dictionary active.';
+      } else {
+        badge.className = 'status-badge offline';
+        text.textContent = 'Offline Mode';
+        badge.title = 'Offline: Standard voices unavailable. Using local offline fonts, PDF parser, dictionary cache & Kokoro Studio HD voices.';
+      }
+    }
+
+    if (voiceSelect) {
+      updateVoiceSelectorOnlineStatus(voiceSelect, online);
+    }
+
+    if (!online && voiceSelect && !isKokoroVoice(currentReaderSettings.ttsVoice)) {
+      showOfflineNotice();
+    } else if (online) {
+      hideOfflineNotice();
     }
   }
 
-  window.addEventListener('online', update);
-  window.addEventListener('offline', update);
-  update();
+  async function refreshConnectivity(force = false) {
+    const online = await checkInternetConnectivity(force);
+    updateNetworkUI(online);
+    return online;
+  }
+
+  window.addEventListener('online', () => refreshConnectivity(true));
+  window.addEventListener('offline', () => {
+    isDeviceOnline = false;
+    updateNetworkUI(false);
+  });
+  window.addEventListener('focus', () => refreshConnectivity(true));
+
+  setInterval(() => {
+    refreshConnectivity(false);
+  }, 5000);
+
+  updateNetworkUI(navigator.onLine);
+  refreshConnectivity(true);
 }
 
 // -------------------------------------------------------------
@@ -1166,8 +1319,27 @@ function initToolbarControls() {
   }
 
   if (voiceSelect) {
+    voiceSelect.addEventListener('click', () => {
+      if (!isDeviceOnline) {
+        const offlineModal = document.getElementById('reader-offline-voice-modal');
+        if (offlineModal) offlineModal.classList.remove('hidden');
+        checkInternetConnectivity(true);
+      }
+    });
+
     voiceSelect.addEventListener('change', async (e) => {
       const chosen = e.target.value;
+
+      if (!isDeviceOnline && !isKokoroVoice(chosen)) {
+        const offlineModal = document.getElementById('reader-offline-voice-modal');
+        if (offlineModal) offlineModal.classList.remove('hidden');
+        const fallback = isKokoroVoice(previousReaderVoice) ? previousReaderVoice : 'af_heart';
+        voiceSelect.value = fallback;
+        currentReaderSettings.ttsVoice = fallback;
+        saveReaderSettings();
+        return;
+      }
+
       updateReaderNeuralTierVisibility(chosen);
 
       if (isKokoroVoice(chosen)) {
@@ -1913,6 +2085,7 @@ function updateToolbarUI() {
   if (voiceEl) {
     populateFilipinoVoiceDropdown(voiceEl, cachedVoices, currentReaderSettings.ttsVoice || 'female');
     voiceEl.value = currentReaderSettings.ttsVoice || 'female';
+    updateVoiceSelectorOnlineStatus(voiceEl, isDeviceOnline);
   }
 
   const speedEl = document.getElementById('reader-tts-speed');
@@ -2694,6 +2867,11 @@ async function playNextReaderTtsChunk() {
   }
 
   const activeVoice = currentReaderSettings.ttsVoice || 'female';
+  if (!isDeviceOnline && !isKokoroVoice(activeVoice)) {
+    const offlineModal = document.getElementById('reader-offline-voice-modal');
+    if (offlineModal) offlineModal.classList.remove('hidden');
+    return;
+  }
   const speedVal = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
 
   // 1. Route to Kokoro Studio Neural Engine
@@ -2730,6 +2908,12 @@ async function playNextReaderTtsChunk() {
   }
 
   // 2. Route to Standard Web SpeechSynthesis
+  if (!isDeviceOnline && !isKokoroVoice(activeVoice)) {
+    handleTtsStop();
+    const offlineModal = document.getElementById('reader-offline-voice-modal');
+    if (offlineModal) offlineModal.classList.remove('hidden');
+    return;
+  }
   if (!window.speechSynthesis) {
     handleTtsStop();
     return;
@@ -2784,6 +2968,11 @@ function handleTtsPlay() {
   }
 
   const activeVoice = currentReaderSettings.ttsVoice || 'female';
+  if (!isDeviceOnline && !isKokoroVoice(activeVoice)) {
+    const offlineModal = document.getElementById('reader-offline-voice-modal');
+    if (offlineModal) offlineModal.classList.remove('hidden');
+    return;
+  }
   const speedVal = parseFloat(currentReaderSettings.ttsSpeed || 1.0);
   const tierVal = currentReaderSettings.ttsEngineTier || 'wasm';
 
@@ -3035,6 +3224,12 @@ async function openDictionaryModal(word) {
           ttsBtn.textContent = 'Listen';
           console.warn('Kokoro dictionary speech error:', e);
         }
+        return;
+      }
+
+      if (!isDeviceOnline) {
+        const offlineModal = document.getElementById('reader-offline-voice-modal');
+        if (offlineModal) offlineModal.classList.remove('hidden');
         return;
       }
 
