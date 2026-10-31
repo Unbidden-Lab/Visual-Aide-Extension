@@ -1456,10 +1456,20 @@ function preparePrintStylesheet() {
         box-shadow: none !important;
         break-inside: auto !important;
         page-break-inside: auto !important;
-        break-after: auto !important;
-        page-break-after: auto !important;
+        break-after: page !important;
+        page-break-after: always !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
+
+      .reader-page:first-child {
+        break-before: auto !important;
+        page-break-before: auto !important;
+      }
+
+      .reader-page:not(:first-child) {
+        break-before: page !important;
+        page-break-before: always !important;
       }
 
       .reader-page:last-child {
