@@ -1207,221 +1207,225 @@ function preparePrintStylesheet() {
       margin: 0.5in;
     }
 
-    :root {
-      --reader-bg: #ffffff !important;
-      --reader-surface: #ffffff !important;
-      --reader-text: #000000 !important;
-      --reader-border: #cccccc !important;
-    }
+    @media print {
+      :root {
+        --reader-bg: #ffffff !important;
+        --reader-surface: #ffffff !important;
+        --reader-text: #000000 !important;
+        --reader-border: #cccccc !important;
+        --va-bg-color: #ffffff !important;
+        --va-text-color: #000000 !important;
+      }
 
-    * {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      color-adjust: exact !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-    }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
 
-    /* Hide all UI chrome, toolbars, sidebars, settings drawers, and audio playback widgets */
-    header,
-    .reader-header,
-    .header-top,
-    .reader-sidebar,
-    #reader-sidebar,
-    .sidebar-toggle-btn,
-    #sidebar-toggle-btn,
-    .sidebar-collapse-btn,
-    #sidebar-collapse-btn,
-    .toolbar-scroll,
-    .accommodation-bar,
-    .tool-group,
-    .tool-item,
-    .reader-ruler-el,
-    .dict-modal,
-    .reader-tooltip,
-    .reader-kokoro-modal,
-    .reader-loading-overlay,
-    .upload-hero,
-    .reader-pagination-bar,
-    .tts-player,
-    .page-nav,
-    .dict-search-box,
-    #va-action-badge,
-    #va-dict-modal,
-    #reader-page-nav,
-    #dict-modal,
-    #reader-ruler,
-    #reader-tooltip,
-    #reader-kokoro-modal,
-    #upload-hero,
-    #print-btn,
-    #upload-nav-btn {
-      display: none !important;
-      visibility: hidden !important;
-    }
+      /* Hide all UI chrome, toolbars, sidebars, settings drawers, and audio playback widgets */
+      header,
+      .reader-header,
+      .header-top,
+      .reader-sidebar,
+      #reader-sidebar,
+      .sidebar-toggle-btn,
+      #sidebar-toggle-btn,
+      .sidebar-collapse-btn,
+      #sidebar-collapse-btn,
+      .toolbar-scroll,
+      .accommodation-bar,
+      .tool-group,
+      .tool-item,
+      .reader-ruler-el,
+      .dict-modal,
+      .reader-tooltip,
+      .reader-kokoro-modal,
+      .reader-loading-overlay,
+      .upload-hero,
+      .reader-pagination-bar,
+      .tts-player,
+      .page-nav,
+      .dict-search-box,
+      #va-action-badge,
+      #va-dict-modal,
+      #reader-page-nav,
+      #dict-modal,
+      #reader-ruler,
+      #reader-tooltip,
+      #reader-kokoro-modal,
+      #upload-hero,
+      #print-btn,
+      #upload-nav-btn {
+        display: none !important;
+        visibility: hidden !important;
+      }
 
-    /* 1. Reset Theme on Print: clean background & deep black text across all containers & text */
-    html,
-    body,
-    body.va-reader-body,
-    #viewer-container,
-    .page-container,
-    .reader-layout,
-    .reader-container {
-      background: #ffffff !important;
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      height: auto !important;
-      min-height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      position: static !important;
-      font-family: ${activeFont}, system-ui, sans-serif !important;
-    }
+      /* 1. Reset Theme on Print: clean background & deep black text across all containers & text */
+      html,
+      body,
+      body.va-reader-body,
+      #viewer-container,
+      .page-container,
+      .reader-layout,
+      .reader-container {
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        font-family: ${activeFont}, system-ui, sans-serif !important;
+      }
 
-    .reader-document {
-      display: block !important;
-      background: #ffffff !important;
-      background-color: #ffffff !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      box-shadow: none !important;
-      border: none !important;
-      border-radius: 0 !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      height: auto !important;
-      min-height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      position: static !important;
-      font-family: ${activeFont}, system-ui, sans-serif !important;
-    }
+      .reader-document {
+        display: block !important;
+        background: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        font-family: ${activeFont}, system-ui, sans-serif !important;
+      }
 
-    .reader-document * {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      background: transparent !important;
-      background-color: transparent !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-    }
+      .reader-document * {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
 
-    /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
-    .reader-page,
-    section,
-    article {
-      display: block !important;
-      background: transparent !important;
-      background-color: transparent !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      height: auto !important;
-      min-height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      position: static !important;
-      box-sizing: border-box !important;
-      margin: 0 !important;
-      padding: 0 0 20px 0 !important;
-      border: none !important;
-      box-shadow: none !important;
-      break-inside: auto !important;
-      page-break-inside: auto !important;
-      break-after: page !important;
-      page-break-after: always !important;
-    }
+      /* 2. Fix Page Clipping & Enable Natural Pagination across pages & paragraphs */
+      .reader-page,
+      section,
+      article {
+        display: block !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        position: static !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0 0 20px 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        break-after: page !important;
+        page-break-after: always !important;
+      }
 
-    .reader-page:last-child {
-      break-after: auto !important;
-      page-break-after: auto !important;
-      margin-bottom: 0 !important;
-      padding-bottom: 0 !important;
-    }
+      .reader-page:last-child {
+        break-after: auto !important;
+        page-break-after: auto !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+      }
 
-    .page-header-tag {
-      display: block !important;
-      color: #555555 !important;
-      -webkit-text-fill-color: #555555 !important;
-      background: transparent !important;
-      font-size: 0.75rem !important;
-      border-bottom: 1px solid #cccccc !important;
-      margin-bottom: 16px !important;
-      padding-bottom: 4px !important;
-      font-family: system-ui, -apple-system, sans-serif !important;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      break-after: avoid !important;
-      page-break-after: avoid !important;
-    }
+      .page-header-tag {
+        display: block !important;
+        color: #555555 !important;
+        -webkit-text-fill-color: #555555 !important;
+        background: transparent !important;
+        font-size: 0.75rem !important;
+        border-bottom: 1px solid #cccccc !important;
+        margin-bottom: 16px !important;
+        padding-bottom: 4px !important;
+        font-family: system-ui, -apple-system, sans-serif !important;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+      }
 
-    p,
-    .reader-document p,
-    li,
-    ul,
-    ol {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      background: transparent !important;
-      line-height: ${activeLeading} !important;
-      letter-spacing: ${activeTracking} !important;
-      word-spacing: ${activeSpacing} !important;
-      margin-top: 0 !important;
-      margin-bottom: 14px !important;
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      orphans: 3 !important;
-      widows: 3 !important;
-    }
+      p,
+      .reader-document p,
+      li,
+      ul,
+      ol {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background: transparent !important;
+        line-height: ${activeLeading} !important;
+        letter-spacing: ${activeTracking} !important;
+        word-spacing: ${activeSpacing} !important;
+        margin-top: 0 !important;
+        margin-bottom: 14px !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        orphans: 3 !important;
+        widows: 3 !important;
+      }
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    .reader-document h1,
-    .reader-document h2,
-    .reader-document h3,
-    .reader-document h4,
-    .reader-document h5,
-    .reader-document h6 {
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      background: transparent !important;
-      height: auto !important;
-      max-height: none !important;
-      overflow: visible !important;
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-      break-after: avoid !important;
-      page-break-after: avoid !important;
-      margin-top: 18px !important;
-      margin-bottom: 8px !important;
-    }
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      .reader-document h1,
+      .reader-document h2,
+      .reader-document h3,
+      .reader-document h4,
+      .reader-document h5,
+      .reader-document h6 {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background: transparent !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+        margin-top: 18px !important;
+        margin-bottom: 8px !important;
+      }
 
-    .va-bionic-fix {
-      font-weight: 700 !important;
-      color: #000000 !important;
-      -webkit-text-fill-color: #000000 !important;
-      background: transparent !important;
+      .va-bionic-fix {
+        font-weight: 700 !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        background: transparent !important;
+      }
     }
   `;
 }
@@ -1482,6 +1486,7 @@ function restoreAfterPrint() {
     isPrintingMultiPage = false;
     displayExtractedPages(currentDocumentTitle);
   }
+  applyAllReaderStyles();
 }
 
 function updateToolbarUI() {
@@ -1581,6 +1586,51 @@ function updateToolbarUI() {
   preparePrintStylesheet();
 }
 
+const IRLEN_PRESETS = {
+  default: {
+    bg: '#1e2025',
+    surface: '#ffffff',
+    text: '#1a1a1a',
+    border: '#d0d7de'
+  },
+  cream: {
+    bg: '#ece5d3',
+    surface: '#fbf5e6',
+    text: '#222222',
+    border: '#e6dcbe'
+  },
+  peach: {
+    bg: '#f2ddd2',
+    surface: '#fff1e8',
+    text: '#26211f',
+    border: '#ebd3c5'
+  },
+  mint: {
+    bg: '#d7e8d9',
+    surface: '#ecf7ed',
+    text: '#1b261b',
+    border: '#c8e0cc'
+  },
+  navy: {
+    bg: '#070f1a',
+    surface: '#0f1f33',
+    text: '#ffd796',
+    border: '#1e3552'
+  },
+  dark: {
+    bg: '#121212',
+    surface: '#1e1e1e',
+    text: '#e8e8e8',
+    border: '#333333'
+  },
+  inverted: {
+    bg: '#000000',
+    surface: '#0a0a0a',
+    text: '#ffff00',
+    border: '#444400'
+  }
+};
+
 function applyAllReaderStyles() {
   const root = document.documentElement;
   root.style.setProperty('--font-family', currentReaderSettings.font);
@@ -1607,70 +1657,84 @@ function applyAllReaderStyles() {
     docContainer.dataset.paperPreset = currentReaderSettings.paperSize || 'letter';
   }
 
-  const body = document.body;
-  body.className = 'va-reader-body';
-  if (currentReaderSettings.contrast && currentReaderSettings.contrast !== 'default') {
-    body.classList.add(`contrast-${currentReaderSettings.contrast}`);
-  }
-
+  const contrastMode = currentReaderSettings.contrast || 'default';
   const hasCustomFontColor = Boolean(
     currentReaderSettings.fontColor && currentReaderSettings.fontColor !== 'default'
   );
 
-  if (currentReaderSettings.contrast === 'custom') {
-    const customBg = currentReaderSettings.customBgColor || '#fbf0d9';
-    const customFg = currentReaderSettings.customFontColor || '#111111';
-    root.style.setProperty('--reader-bg', customBg);
-    root.style.setProperty('--reader-surface', customBg);
-    root.style.setProperty('--reader-text', customFg);
-    body.style.setProperty('--reader-text', customFg, 'important');
-    if (docContainer) {
-      docContainer.style.setProperty('--reader-text', customFg, 'important');
-      docContainer.style.setProperty('color', customFg, 'important');
-      docContainer.style.setProperty('-webkit-text-fill-color', customFg, 'important');
-      const textEls = docContainer.querySelectorAll(
-        'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
-      );
-      textEls.forEach((el) => {
-        el.style.setProperty('color', customFg, 'important');
-        el.style.setProperty('-webkit-text-fill-color', customFg, 'important');
-      });
-    }
+  let activeBg;
+  let activeSurface;
+  let activeText;
+  let activeBorder;
+
+  if (contrastMode === 'custom') {
+    activeBg = currentReaderSettings.customBgColor || '#fbf0d9';
+    activeSurface = activeBg;
+    activeText = currentReaderSettings.customFontColor || '#111111';
+    activeBorder = '#cccccc';
   } else {
-    root.style.removeProperty('--reader-bg');
-    root.style.removeProperty('--reader-surface');
-    if (hasCustomFontColor) {
-      const chosenColor = currentReaderSettings.fontColor;
-      root.style.setProperty('--reader-text', chosenColor);
-      body.style.setProperty('--reader-text', chosenColor, 'important');
-      if (docContainer) {
-        docContainer.style.setProperty('--reader-text', chosenColor, 'important');
-        docContainer.style.setProperty('color', chosenColor, 'important');
-        docContainer.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
-        const textEls = docContainer.querySelectorAll(
-          'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
-        );
-        textEls.forEach((el) => {
-          el.style.setProperty('color', chosenColor, 'important');
-          el.style.setProperty('-webkit-text-fill-color', chosenColor, 'important');
-        });
-      }
-    } else {
-      root.style.removeProperty('--reader-text');
-      body.style.removeProperty('--reader-text');
-      if (docContainer) {
-        docContainer.style.removeProperty('--reader-text');
-        docContainer.style.removeProperty('color');
-        docContainer.style.removeProperty('-webkit-text-fill-color');
-        const textEls = docContainer.querySelectorAll(
-          'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
-        );
-        textEls.forEach((el) => {
-          el.style.removeProperty('color');
-          el.style.removeProperty('-webkit-text-fill-color');
-        });
-      }
+    const preset = IRLEN_PRESETS[contrastMode] || IRLEN_PRESETS.default;
+    activeBg = preset.bg;
+    activeSurface = preset.surface;
+    activeText = hasCustomFontColor ? currentReaderSettings.fontColor : preset.text;
+    activeBorder = preset.border;
+  }
+
+  // Update root CSS custom properties
+  root.style.setProperty('--reader-bg', activeBg);
+  root.style.setProperty('--reader-surface', activeSurface);
+  root.style.setProperty('--reader-text', activeText);
+  root.style.setProperty('--reader-border', activeBorder);
+  root.style.setProperty('--va-bg-color', activeSurface);
+  root.style.setProperty('--va-text-color', activeText);
+
+  // Update body wrapper classes and CSS variables
+  const body = document.body;
+  body.className = 'va-reader-body';
+  if (contrastMode !== 'default') {
+    body.classList.add(`contrast-${contrastMode}`);
+  }
+  body.style.setProperty('--reader-bg', activeBg);
+  body.style.setProperty('--reader-surface', activeSurface);
+  body.style.setProperty('--reader-text', activeText);
+  body.style.setProperty('--reader-border', activeBorder);
+  body.style.setProperty('--va-bg-color', activeSurface);
+  body.style.setProperty('--va-text-color', activeText);
+
+  // Update #viewer-container wrapper classes and CSS variables
+  const viewerContainer = document.getElementById('viewer-container');
+  if (viewerContainer) {
+    viewerContainer.className = 'viewer-container page-container';
+    if (contrastMode !== 'default') {
+      viewerContainer.classList.add(`contrast-${contrastMode}`);
     }
+    viewerContainer.style.setProperty('--reader-bg', activeBg);
+    viewerContainer.style.setProperty('--reader-surface', activeSurface);
+    viewerContainer.style.setProperty('--reader-text', activeText);
+    viewerContainer.style.setProperty('--reader-border', activeBorder);
+    viewerContainer.style.setProperty('--va-bg-color', activeSurface);
+    viewerContainer.style.setProperty('--va-text-color', activeText);
+  }
+
+  // Update #reader-document and explicit child text colors
+  if (docContainer) {
+    docContainer.style.setProperty('--reader-bg', activeBg);
+    docContainer.style.setProperty('--reader-surface', activeSurface);
+    docContainer.style.setProperty('--reader-text', activeText);
+    docContainer.style.setProperty('--reader-border', activeBorder);
+    docContainer.style.setProperty('--va-bg-color', activeSurface);
+    docContainer.style.setProperty('--va-text-color', activeText);
+    docContainer.style.backgroundColor = activeSurface;
+    docContainer.style.color = activeText;
+    docContainer.style.borderColor = activeBorder;
+
+    const textEls = docContainer.querySelectorAll(
+      'p, h1, h2, h3, h4, h5, h6, span:not(.page-header-tag), b, strong, em, i, a, section'
+    );
+    textEls.forEach((el) => {
+      el.style.color = activeText;
+      el.style.webkitTextFillColor = activeText;
+    });
   }
 }
 

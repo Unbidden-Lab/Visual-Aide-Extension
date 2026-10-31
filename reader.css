@@ -5,6 +5,8 @@
   --reader-surface: #ffffff;
   --reader-text: #1a1a1a;
   --reader-border: #d0d7de;
+  --va-bg-color: #ffffff;
+  --va-text-color: #1a1a1a;
   --header-bg: #111111;
   --header-text: #f0f0f0;
   --accent: #00ffcc;
@@ -799,6 +801,15 @@ input[type=range]::-moz-range-thumb:hover {
   transition: padding 0.28s ease;
 }
 
+/* Viewer Container / Page Container */
+.viewer-container,
+.page-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 /* Upload Hero Dropzone */
 .upload-hero {
   display: flex;
@@ -1159,41 +1170,71 @@ input[type=range]::-moz-range-thumb:hover {
 }
 
 /* Irlen Contrast Themes */
-body.contrast-cream {
+body.contrast-cream,
+#viewer-container.contrast-cream {
   --reader-bg: #ece5d3;
   --reader-surface: #fbf5e6;
   --reader-text: #222222;
   --reader-border: #e6dcbe;
+  --va-bg-color: #fbf5e6;
+  --va-text-color: #222222;
 }
-body.contrast-peach {
+body.contrast-peach,
+#viewer-container.contrast-peach {
   --reader-bg: #f2ddd2;
   --reader-surface: #fff1e8;
   --reader-text: #26211f;
   --reader-border: #ebd3c5;
+  --va-bg-color: #fff1e8;
+  --va-text-color: #26211f;
 }
-body.contrast-mint {
+body.contrast-mint,
+#viewer-container.contrast-mint {
   --reader-bg: #d7e8d9;
   --reader-surface: #ecf7ed;
   --reader-text: #1b261b;
   --reader-border: #c8e0cc;
+  --va-bg-color: #ecf7ed;
+  --va-text-color: #1b261b;
 }
-body.contrast-navy {
+body.contrast-navy,
+#viewer-container.contrast-navy {
   --reader-bg: #070f1a;
   --reader-surface: #0f1f33;
   --reader-text: #ffd796;
   --reader-border: #1e3552;
+  --va-bg-color: #0f1f33;
+  --va-text-color: #ffd796;
 }
-body.contrast-dark {
+body.contrast-dark,
+#viewer-container.contrast-dark {
   --reader-bg: #121212;
   --reader-surface: #1e1e1e;
   --reader-text: #e8e8e8;
   --reader-border: #333333;
+  --va-bg-color: #1e1e1e;
+  --va-text-color: #e8e8e8;
 }
-body.contrast-inverted {
+body.contrast-inverted,
+#viewer-container.contrast-inverted {
   --reader-bg: #000000;
   --reader-surface: #0a0a0a;
   --reader-text: #ffff00;
   --reader-border: #444400;
+  --va-bg-color: #0a0a0a;
+  --va-text-color: #ffff00;
+}
+body.contrast-custom,
+#viewer-container.contrast-custom {
+  --reader-border: #cccccc;
+}
+
+body.contrast-navy .page-header-tag,
+body.contrast-dark .page-header-tag,
+body.contrast-inverted .page-header-tag {
+  color: var(--reader-text);
+  border-bottom-color: var(--reader-border);
+  opacity: 0.75;
 }
 
 /* Paper Size & Custom Dimension Fields */
@@ -1250,6 +1291,8 @@ body.contrast-inverted {
     --reader-surface: #ffffff !important;
     --reader-text: #000000 !important;
     --reader-border: #cccccc !important;
+    --va-bg-color: #ffffff !important;
+    --va-text-color: #000000 !important;
   }
 
   * {
